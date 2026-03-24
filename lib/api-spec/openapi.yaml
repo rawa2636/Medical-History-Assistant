@@ -1,22 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Hakim Medical History Assistant API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: patients
+    description: Patient management
+  - name: cases
+    description: Medical cases
+  - name: interview
+    description: AI-driven interview
+  - name: reports
+    description: Medical reports
+  - name: doctor
+    description: Doctor review
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,358 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /patients:
+    get:
+      operationId: listPatients
+      tags: [patients]
+      summary: List all patients
+      responses:
+        "200":
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patient"
+    post:
+      operationId: createPatient
+      tags: [patients]
+      summary: Create a new patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatientRequest"
+      responses:
+        "201":
+          description: Patient created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+
+  /patients/{id}:
+    get:
+      operationId: getPatient
+      tags: [patients]
+      summary: Get patient by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient data with profile and cases
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientFull"
+    put:
+      operationId: updatePatient
+      tags: [patients]
+      summary: Update patient profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatientRequest"
+      responses:
+        "200":
+          description: Patient updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+
+  /patients/{id}/profile:
+    post:
+      operationId: savePatientProfile
+      tags: [patients]
+      summary: Save/update patient medical profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientProfileRequest"
+      responses:
+        "200":
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientProfile"
+
+  /patients/{id}/cases:
+    get:
+      operationId: getPatientCases
+      tags: [patients]
+      summary: List cases for a patient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cases list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+
+  /cases:
+    post:
+      operationId: createCase
+      tags: [cases]
+      summary: Start a new medical case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCaseRequest"
+      responses:
+        "201":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+
+  /cases/{id}:
+    get:
+      operationId: getCase
+      tags: [cases]
+      summary: Get case details with session and report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Case data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseFull"
+
+  /cases/{id}/ros:
+    post:
+      operationId: saveRos
+      tags: [cases]
+      summary: Save Review of Systems symptom selection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RosRequest"
+      responses:
+        "200":
+          description: ROS saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+
+  /cases/{id}/chief-complaints:
+    post:
+      operationId: saveChiefComplaints
+      tags: [cases]
+      summary: Save chief complaints
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChiefComplaintsRequest"
+      responses:
+        "200":
+          description: Complaints saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+
+  /cases/{id}/interview/start:
+    post:
+      operationId: startInterview
+      tags: [interview]
+      summary: Start the AI interview for a case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Interview started, returns first question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSession"
+
+  /cases/{id}/interview/message:
+    post:
+      operationId: sendInterviewMessage
+      tags: [interview]
+      summary: Send patient response and get next question (streaming)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterviewMessageRequest"
+      responses:
+        "200":
+          description: SSE stream of AI response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /cases/{id}/interview/complete:
+    post:
+      operationId: completeInterview
+      tags: [interview]
+      summary: Mark interview as complete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Interview completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSession"
+
+  /cases/{id}/generate-report:
+    post:
+      operationId: generateReport
+      tags: [reports]
+      summary: Generate structured medical history report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /cases/{id}/report:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get the report for a case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Medical report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /cases/{id}/doctor-review:
+    get:
+      operationId: getDoctorReview
+      tags: [doctor]
+      summary: Get full case info for doctor review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Full case for review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorReview"
+    post:
+      operationId: addDoctorNote
+      tags: [doctor]
+      summary: Doctor adds notes to a case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DoctorNoteRequest"
+      responses:
+        "201":
+          description: Note added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorNote"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +394,427 @@ components:
       required:
         - status
 
+    Patient:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        age:
+          type: integer
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        occupation:
+          type: string
+          nullable: true
+        weight:
+          type: string
+          nullable: true
+        height:
+          type: string
+          nullable: true
+        maritalStatus:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    PatientProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        chronicConditions:
+          type: array
+          items:
+            type: string
+        surgicalHistory:
+          type: array
+          items:
+            type: string
+        currentMedications:
+          type: array
+          items:
+            type: object
+        allergies:
+          type: array
+          items:
+            type: object
+        familyHistory:
+          type: object
+        smokingStatus:
+          type: string
+          nullable: true
+        alcoholUse:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - patientId
+        - createdAt
+
+    PatientFull:
+      type: object
+      properties:
+        patient:
+          $ref: "#/components/schemas/Patient"
+        profile:
+          $ref: "#/components/schemas/PatientProfile"
+          nullable: true
+        cases:
+          type: array
+          items:
+            $ref: "#/components/schemas/Case"
+      required:
+        - patient
+        - cases
+
+    Case:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        status:
+          type: string
+        rosSymptoms:
+          type: object
+          nullable: true
+        chiefComplaints:
+          type: array
+          items:
+            type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - patientId
+        - status
+        - createdAt
+        - updatedAt
+
+    CaseFull:
+      type: object
+      properties:
+        case:
+          $ref: "#/components/schemas/Case"
+        session:
+          $ref: "#/components/schemas/InterviewSession"
+          nullable: true
+        report:
+          $ref: "#/components/schemas/Report"
+          nullable: true
+        doctorNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorNote"
+      required:
+        - case
+        - doctorNotes
+
+    InterviewSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        caseId:
+          type: integer
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/InterviewMessage"
+        isComplete:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - caseId
+        - messages
+        - isComplete
+        - createdAt
+        - updatedAt
+
+    InterviewMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - role
+        - content
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+        caseId:
+          type: integer
+        patientInfo:
+          type: object
+        chiefComplaint:
+          type: string
+          nullable: true
+        hpi:
+          type: string
+          nullable: true
+        ros:
+          type: string
+          nullable: true
+        pmh:
+          type: string
+          nullable: true
+        drugHistory:
+          type: string
+          nullable: true
+        allergyHistory:
+          type: string
+          nullable: true
+        familyHistory:
+          type: string
+          nullable: true
+        socialHistory:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        generatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - caseId
+        - patientInfo
+        - generatedAt
+
+    DoctorNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        caseId:
+          type: integer
+        doctorName:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - caseId
+        - doctorName
+        - notes
+        - createdAt
+
+    DoctorReview:
+      type: object
+      properties:
+        case:
+          $ref: "#/components/schemas/Case"
+        patient:
+          $ref: "#/components/schemas/Patient"
+        profile:
+          $ref: "#/components/schemas/PatientProfile"
+          nullable: true
+        session:
+          $ref: "#/components/schemas/InterviewSession"
+          nullable: true
+        report:
+          $ref: "#/components/schemas/Report"
+          nullable: true
+        doctorNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorNote"
+      required:
+        - case
+        - patient
+        - doctorNotes
+
+    CreatePatientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        age:
+          type: integer
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        occupation:
+          type: string
+          nullable: true
+        weight:
+          type: string
+          nullable: true
+        height:
+          type: string
+          nullable: true
+        maritalStatus:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+      required:
+        - name
+
+    UpdatePatientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        occupation:
+          type: string
+          nullable: true
+        weight:
+          type: string
+          nullable: true
+        height:
+          type: string
+          nullable: true
+        maritalStatus:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+
+    PatientProfileRequest:
+      type: object
+      properties:
+        chronicConditions:
+          type: array
+          items:
+            type: string
+        surgicalHistory:
+          type: array
+          items:
+            type: string
+        currentMedications:
+          type: array
+          items:
+            type: object
+        allergies:
+          type: array
+          items:
+            type: object
+        familyHistory:
+          type: object
+        smokingStatus:
+          type: string
+          nullable: true
+        alcoholUse:
+          type: string
+          nullable: true
+
+    CreateCaseRequest:
+      type: object
+      properties:
+        patientId:
+          type: integer
+      required:
+        - patientId
+
+    RosRequest:
+      type: object
+      properties:
+        symptoms:
+          type: object
+          description: Map of system name to array of selected symptoms
+      required:
+        - symptoms
+
+    ChiefComplaintsRequest:
+      type: object
+      properties:
+        complaints:
+          type: array
+          items:
+            type: object
+            properties:
+              symptom:
+                type: string
+              duration:
+                type: string
+            required:
+              - symptom
+              - duration
+      required:
+        - complaints
+
+    InterviewMessageRequest:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    DoctorNoteRequest:
+      type: object
+      properties:
+        doctorName:
+          type: string
+        notes:
+          type: string
+      required:
+        - doctorName
+        - notes

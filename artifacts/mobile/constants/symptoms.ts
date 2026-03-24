@@ -1,0 +1,156 @@
+export interface SymptomSystem {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  symptoms: string[];
+}
+
+export const SYMPTOM_SYSTEMS: SymptomSystem[] = [
+  {
+    id: "cardiovascular",
+    name: "Cardiovascular",
+    icon: "heart",
+    color: "#E53E3E",
+    symptoms: [
+      "Chest pain",
+      "Palpitations",
+      "Shortness of breath on exertion",
+      "Ankle swelling",
+      "Syncope/fainting",
+      "Orthopnoea",
+    ],
+  },
+  {
+    id: "respiratory",
+    name: "Respiratory",
+    icon: "wind",
+    color: "#3182CE",
+    symptoms: [
+      "Cough",
+      "Shortness of breath",
+      "Wheezing",
+      "Haemoptysis",
+      "Chest tightness",
+      "Sputum production",
+    ],
+  },
+  {
+    id: "gastrointestinal",
+    name: "Gastrointestinal",
+    icon: "activity",
+    color: "#D69E2E",
+    symptoms: [
+      "Nausea",
+      "Vomiting",
+      "Abdominal pain",
+      "Diarrhoea",
+      "Constipation",
+      "Bloating",
+      "Heartburn",
+      "Difficulty swallowing",
+      "Loss of appetite",
+      "Blood in stool",
+    ],
+  },
+  {
+    id: "neurological",
+    name: "Neurological",
+    icon: "zap",
+    color: "#805AD5",
+    symptoms: [
+      "Headache",
+      "Dizziness",
+      "Numbness or tingling",
+      "Weakness",
+      "Memory problems",
+      "Visual disturbance",
+      "Seizures",
+      "Difficulty speaking",
+    ],
+  },
+  {
+    id: "musculoskeletal",
+    name: "Musculoskeletal",
+    icon: "layers",
+    color: "#DD6B20",
+    symptoms: [
+      "Joint pain",
+      "Muscle pain",
+      "Back pain",
+      "Stiffness",
+      "Swelling of joints",
+      "Limited range of motion",
+    ],
+  },
+  {
+    id: "urological",
+    name: "Urological",
+    icon: "droplet",
+    color: "#38A169",
+    symptoms: [
+      "Frequent urination",
+      "Painful urination",
+      "Blood in urine",
+      "Difficulty urinating",
+      "Urinary incontinence",
+      "Decreased urine output",
+    ],
+  },
+  {
+    id: "dermatological",
+    name: "Dermatological",
+    icon: "layers",
+    color: "#E53E3E",
+    symptoms: [
+      "Rash",
+      "Itching",
+      "Skin discolouration",
+      "Hair loss",
+      "Nail changes",
+      "Wounds that won't heal",
+    ],
+  },
+  {
+    id: "constitutional",
+    name: "General / Constitutional",
+    icon: "thermometer",
+    color: "#718096",
+    symptoms: [
+      "Fever",
+      "Fatigue",
+      "Weight loss",
+      "Weight gain",
+      "Night sweats",
+      "Loss of appetite",
+      "Generalised weakness",
+    ],
+  },
+  {
+    id: "endocrine",
+    name: "Endocrine",
+    icon: "sun",
+    color: "#F6AD55",
+    symptoms: [
+      "Excessive thirst",
+      "Excessive urination",
+      "Heat or cold intolerance",
+      "Tremors",
+      "Changes in menstrual cycle",
+    ],
+  },
+  {
+    id: "psychiatric",
+    name: "Psychiatric",
+    icon: "smile",
+    color: "#4299E1",
+    symptoms: [
+      "Anxiety",
+      "Depression",
+      "Sleep disturbance",
+      "Mood changes",
+      "Hallucinations",
+      "Concentration difficulties",
+    ],
+  },
+];
