@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   Modal,
+  Linking,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -187,6 +188,40 @@ export default function ReportScreen() {
     }
   }
 
+  function handleSendToHakeemAI() {
+    if (!report) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const fullReportText = [
+      report.chiefComplaints ? `CHIEF COMPLAINT:\n${report.chiefComplaints}` : "",
+      report.historyOfPresentIllness ? `HISTORY OF PRESENT ILLNESS:\n${report.historyOfPresentIllness}` : "",
+      report.reviewOfSystems ? `REVIEW OF SYSTEMS:\n${report.reviewOfSystems}` : "",
+      report.pastMedicalHistory ? `PAST MEDICAL HISTORY:\n${report.pastMedicalHistory}` : "",
+      report.familyHistory ? `FAMILY HISTORY:\n${report.familyHistory}` : "",
+      report.socialHistory ? `SOCIAL HISTORY:\n${report.socialHistory}` : "",
+      report.medicationsAllergies ? `MEDICATIONS & ALLERGIES:\n${report.medicationsAllergies}` : "",
+      report.physicalExamination ? `PHYSICAL EXAMINATION:\n${report.physicalExamination}` : "",
+      report.assessment ? `ASSESSMENT:\n${report.assessment}` : "",
+      report.plan ? `PLAN:\n${report.plan}` : "",
+    ].filter(Boolean).join("\n\n");
+
+    const patientId = `PT-${report.id}`;
+    const params = new URLSearchParams({
+      patient_id: patientId,
+      clinical_report: fullReportText,
+    });
+
+    const url = `https://ais-dev-xpjr2yp3eu2ymplb5goees-208426721291.europe-west2.run.app/new?${params.toString()}`;
+
+    if (Platform.OS === "web") {
+      window.open(url, "_blank");
+    } else {
+      Linking.openURL(url).catch(() => {
+        Alert.alert("Error", "Could not open HakeemAI. Please try again.");
+      });
+    }
+  }
+
   async function handleDownloadPDF() {
     if (!report) return;
     setDownloading(true);
@@ -324,23 +359,33 @@ export default function ReportScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+      <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border }]}>
+        <View style={[styles.footerRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <TouchableOpacity
+            style={[styles.footerBtn, { backgroundColor: C.primary + "12", borderColor: C.primary + "30", flex: 1 }]}
+            onPress={handleDownloadPDF}
+            disabled={downloading}
+            activeOpacity={0.8}
+          >
+            <Feather name="download" size={18} color={C.primary} />
+            <Text style={[styles.footerBtnText, { color: C.primary }]}>{t("downloadPDF")}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.footerBtn, { backgroundColor: C.primary, flex: 1 }]}
+            onPress={() => { Haptics.selectionAsync(); setShowSendModal(true); }}
+            activeOpacity={0.85}
+          >
+            <Feather name="send" size={18} color="#fff" />
+            <Text style={[styles.footerBtnText, { color: "#fff" }]}>{t("sendCase")}</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
-          style={[styles.footerBtn, { backgroundColor: C.primary + "12", borderColor: C.primary + "30", flex: 1 }]}
-          onPress={handleDownloadPDF}
-          disabled={downloading}
-          activeOpacity={0.8}
-        >
-          <Feather name="download" size={18} color={C.primary} />
-          <Text style={[styles.footerBtnText, { color: C.primary }]}>{t("downloadPDF")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.footerBtn, { backgroundColor: C.primary, flex: 1 }]}
-          onPress={() => { Haptics.selectionAsync(); setShowSendModal(true); }}
+          style={[styles.hakeemBtn, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+          onPress={handleSendToHakeemAI}
           activeOpacity={0.85}
         >
-          <Feather name="send" size={18} color="#fff" />
-          <Text style={[styles.footerBtnText, { color: "#fff" }]}>{t("sendCase")}</Text>
+          <Text style={styles.hakeemBtnText}>✨</Text>
+          <Text style={styles.hakeemBtnText}>{isRTL ? "تحليل مع HakeemAI" : "Analyze with HakeemAI"}</Text>
         </TouchableOpacity>
       </View>
 
@@ -378,8 +423,11 @@ const styles = StyleSheet.create({
   sectionContent: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
   disclaimer: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 16, lineHeight: 16 },
   footer: { paddingTop: 12, paddingHorizontal: 16, gap: 8, borderTopWidth: 1 },
+  footerRow: { gap: 8 },
   footerBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "transparent" },
   footerBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  hakeemBtn: { alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 14, backgroundColor: "#0f172a" },
+  hakeemBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 },
   modalHeader: { alignItems: "center", justifyContent: "space-between" },

@@ -21,6 +21,90 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
+type TagInputProps = {
+  label: string;
+  items: string[];
+  onAdd: (item: string) => void;
+  onRemove: (idx: number) => void;
+  placeholder?: string;
+  isRTL: boolean;
+  textAlign: "left" | "right";
+};
+
+function TagInput({ label, items, onAdd, onRemove, placeholder, isRTL, textAlign }: TagInputProps) {
+  const [input, setInputValue] = useState("");
+  const handleAdd = () => {
+    if (input.trim()) {
+      onAdd(input.trim());
+      setInputValue("");
+    }
+  };
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{label}</Text>
+      <View style={styles.tagRow}>
+        {items.map((item, idx) => (
+          <TouchableOpacity
+            key={idx}
+            style={[styles.tag, { backgroundColor: C.primary + "20", borderColor: C.primary + "40", flexDirection: isRTL ? "row-reverse" : "row" }]}
+            onPress={() => onRemove(idx)}
+          >
+            <Text style={[styles.tagText, { color: C.primary }]}>{item}</Text>
+            <Feather name="x" size={12} color={C.primary} />
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={[styles.inputRow, { borderColor: C.border, backgroundColor: C.backgroundSecondary, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+        <TextInput
+          style={[styles.tagInput, { color: C.text, textAlign }]}
+          value={input}
+          onChangeText={setInputValue}
+          placeholder={placeholder || (isRTL ? "أضف..." : "Add item...")}
+          placeholderTextColor={C.textTertiary}
+          onSubmitEditing={handleAdd}
+          returnKeyType="done"
+        />
+        <TouchableOpacity onPress={handleAdd} style={[styles.addTagBtn, { backgroundColor: C.primary }]}>
+          <Feather name="plus" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+type SelectOptionProps = {
+  label: string;
+  options: string[];
+  arOptions?: string[];
+  value: string;
+  onChange: (v: string) => void;
+  isRTL: boolean;
+  textAlign: "left" | "right";
+};
+
+function SelectOption({ label, options, arOptions, value, onChange, isRTL, textAlign }: SelectOptionProps) {
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{label}</Text>
+      <View style={styles.optionRow}>
+        {options.map((opt, idx) => {
+          const displayLabel = isRTL && arOptions ? arOptions[idx] : opt;
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.optionBtn, { backgroundColor: value === opt ? C.primary : C.backgroundSecondary, borderColor: value === opt ? C.primary : C.border }]}
+              onPress={() => onChange(value === opt ? "" : opt)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.optionBtnText, { color: value === opt ? "#fff" : C.textSecondary }]}>{displayLabel}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function PatientProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -67,66 +151,6 @@ export default function PatientProfileScreen() {
     }
   }
 
-  function TagInput({ label, items, onAdd, onRemove, placeholder }: {
-    label: string; items: string[];
-    onAdd: (item: string) => void; onRemove: (idx: number) => void; placeholder?: string;
-  }) {
-    const [input, setInputValue] = useState("");
-    const handleAdd = () => { if (input.trim()) { onAdd(input.trim()); setInputValue(""); } };
-    return (
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{label}</Text>
-        <View style={styles.tagRow}>
-          {items.map((item, idx) => (
-            <TouchableOpacity key={idx} style={[styles.tag, { backgroundColor: C.primary + "20", borderColor: C.primary + "40", flexDirection: isRTL ? "row-reverse" : "row" }]} onPress={() => onRemove(idx)}>
-              <Text style={[styles.tagText, { color: C.primary }]}>{item}</Text>
-              <Feather name="x" size={12} color={C.primary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={[styles.inputRow, { borderColor: C.border, backgroundColor: C.backgroundSecondary, flexDirection: isRTL ? "row-reverse" : "row" }]}>
-          <TextInput
-            style={[styles.tagInput, { color: C.text, textAlign }]}
-            value={input}
-            onChangeText={setInputValue}
-            placeholder={placeholder || (isRTL ? "أضف..." : "Add item...")}
-            placeholderTextColor={C.textTertiary}
-            onSubmitEditing={handleAdd}
-            returnKeyType="done"
-          />
-          <TouchableOpacity onPress={handleAdd} style={[styles.addTagBtn, { backgroundColor: C.primary }]}>
-            <Feather name="plus" size={16} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  function SelectOption({ label, options, arOptions, value, onChange }: {
-    label: string; options: string[]; arOptions?: string[]; value: string; onChange: (v: string) => void;
-  }) {
-    return (
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{label}</Text>
-        <View style={styles.optionRow}>
-          {options.map((opt, idx) => {
-            const displayLabel = isRTL && arOptions ? arOptions[idx] : opt;
-            return (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.optionBtn, { backgroundColor: value === opt ? C.primary : C.backgroundSecondary, borderColor: value === opt ? C.primary : C.border }]}
-                onPress={() => onChange(value === opt ? "" : opt)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.optionBtnText, { color: value === opt ? "#fff" : C.textSecondary }]}>{displayLabel}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
@@ -147,25 +171,81 @@ export default function PatientProfileScreen() {
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>{t("pastMedicalHistory")}</Text>
-          <TagInput label={t("chronicConditions")} items={chronicConditions} onAdd={(v) => setChronicConditions((p) => [...p, v])} onRemove={(i) => setChronicConditions((p) => p.filter((_, idx) => idx !== i))} placeholder={isRTL ? "مثال: ارتفاع ضغط الدم" : "e.g. Hypertension"} />
-          <TagInput label={t("surgicalHistory")} items={surgicalHistory} onAdd={(v) => setSurgicalHistory((p) => [...p, v])} onRemove={(i) => setSurgicalHistory((p) => p.filter((_, idx) => idx !== i))} placeholder={isRTL ? "مثال: استئصال الزائدة 2010" : "e.g. Appendicectomy 2010"} />
+          <TagInput
+            label={t("chronicConditions")}
+            items={chronicConditions}
+            onAdd={(v) => setChronicConditions((p) => [...p, v])}
+            onRemove={(i) => setChronicConditions((p) => p.filter((_, idx) => idx !== i))}
+            placeholder={isRTL ? "مثال: ارتفاع ضغط الدم" : "e.g. Hypertension"}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
+          <TagInput
+            label={t("surgicalHistory")}
+            items={surgicalHistory}
+            onAdd={(v) => setSurgicalHistory((p) => [...p, v])}
+            onRemove={(i) => setSurgicalHistory((p) => p.filter((_, idx) => idx !== i))}
+            placeholder={isRTL ? "مثال: استئصال الزائدة 2010" : "e.g. Appendicectomy 2010"}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>{isRTL ? "الأدوية والحساسية" : "Medications & Allergies"}</Text>
-          <TagInput label={t("currentMedications")} items={medications} onAdd={(v) => setMedications((p) => [...p, v])} onRemove={(i) => setMedications((p) => p.filter((_, idx) => idx !== i))} placeholder={isRTL ? "مثال: ميتفورمين 500 مجم" : "e.g. Metformin 500mg"} />
-          <TagInput label={t("allergies")} items={allergies} onAdd={(v) => setAllergies((p) => [...p, v])} onRemove={(i) => setAllergies((p) => p.filter((_, idx) => idx !== i))} placeholder={isRTL ? "مثال: البنسلين" : "e.g. Penicillin"} />
+          <TagInput
+            label={t("currentMedications")}
+            items={medications}
+            onAdd={(v) => setMedications((p) => [...p, v])}
+            onRemove={(i) => setMedications((p) => p.filter((_, idx) => idx !== i))}
+            placeholder={isRTL ? "مثال: ميتفورمين 500 مجم" : "e.g. Metformin 500mg"}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
+          <TagInput
+            label={t("allergies")}
+            items={allergies}
+            onAdd={(v) => setAllergies((p) => [...p, v])}
+            onRemove={(i) => setAllergies((p) => p.filter((_, idx) => idx !== i))}
+            placeholder={isRTL ? "مثال: البنسلين" : "e.g. Penicillin"}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>{t("familyHistory")}</Text>
-          <TagInput label={isRTL ? "الأمراض العائلية" : "Family Conditions"} items={familyConditions} onAdd={(v) => setFamilyConditions((p) => [...p, v])} onRemove={(i) => setFamilyConditions((p) => p.filter((_, idx) => idx !== i))} placeholder={isRTL ? "مثال: السكري (الأب)" : "e.g. Diabetes (Father)"} />
+          <TagInput
+            label={isRTL ? "الأمراض العائلية" : "Family Conditions"}
+            items={familyConditions}
+            onAdd={(v) => setFamilyConditions((p) => [...p, v])}
+            onRemove={(i) => setFamilyConditions((p) => p.filter((_, idx) => idx !== i))}
+            placeholder={isRTL ? "مثال: السكري (الأب)" : "e.g. Diabetes (Father)"}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>{t("socialHistory")}</Text>
-          <SelectOption label={t("smokingStatus")} options={["Non-smoker", "Ex-smoker", "Current smoker"]} arOptions={["غير مدخن", "مدخن سابق", "مدخن حالي"]} value={smokingStatus} onChange={setSmokingStatus} />
-          <SelectOption label={t("alcoholUse")} options={["None", "Occasional", "Moderate", "Heavy"]} arOptions={["لا شيء", "أحياناً", "متوسط", "مفرط"]} value={alcoholUse} onChange={setAlcoholUse} />
+          <SelectOption
+            label={t("smokingStatus")}
+            options={["Non-smoker", "Ex-smoker", "Current smoker"]}
+            arOptions={["غير مدخن", "مدخن سابق", "مدخن حالي"]}
+            value={smokingStatus}
+            onChange={setSmokingStatus}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
+          <SelectOption
+            label={t("alcoholUse")}
+            options={["None", "Occasional", "Moderate", "Heavy"]}
+            arOptions={["لا شيء", "أحياناً", "متوسط", "مفرط"]}
+            value={alcoholUse}
+            onChange={setAlcoholUse}
+            isRTL={isRTL}
+            textAlign={textAlign}
+          />
         </View>
       </ScrollView>
 

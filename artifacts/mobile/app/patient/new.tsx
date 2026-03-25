@@ -21,6 +21,35 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
+type FieldProps = {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+  keyboardType?: any;
+  required?: boolean;
+  textAlign: "left" | "right";
+};
+
+function Field({ label, value, onChangeText, placeholder, keyboardType = "default", required = false, textAlign }: FieldProps) {
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>
+        {label}{required && <Text style={{ color: C.error }}> *</Text>}
+      </Text>
+      <TextInput
+        style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.backgroundSecondary, textAlign }]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={C.textTertiary}
+        keyboardType={keyboardType}
+        returnKeyType="next"
+      />
+    </View>
+  );
+}
+
 export default function NewPatientScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -88,28 +117,6 @@ export default function NewPatientScreen() {
     }
   }
 
-  function Field({ label, value, onChangeText, placeholder, keyboardType = "default", required = false }: {
-    label: string; value: string; onChangeText: (t: string) => void;
-    placeholder?: string; keyboardType?: any; required?: boolean;
-  }) {
-    return (
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>
-          {label}{required && <Text style={{ color: C.error }}> *</Text>}
-        </Text>
-        <TextInput
-          style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.backgroundSecondary, textAlign }]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={C.textTertiary}
-          keyboardType={keyboardType}
-          returnKeyType="next"
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
@@ -125,8 +132,8 @@ export default function NewPatientScreen() {
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>
             {isRTL ? "بيانات المريض" : "Patient Information"}
           </Text>
-          <Field label={t("fullName")} value={name} onChangeText={setName} placeholder={t("fullNamePlaceholder")} required />
-          <Field label={t("age")} value={age} onChangeText={setAge} placeholder={t("agePlaceholder")} keyboardType="numeric" />
+          <Field label={t("fullName")} value={name} onChangeText={setName} placeholder={t("fullNamePlaceholder")} required textAlign={textAlign} />
+          <Field label={t("age")} value={age} onChangeText={setAge} placeholder={t("agePlaceholder")} keyboardType="numeric" textAlign={textAlign} />
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{t("gender")}</Text>
@@ -139,7 +146,7 @@ export default function NewPatientScreen() {
             </View>
           </View>
 
-          <Field label={t("occupation")} value={occupation} onChangeText={setOccupation} placeholder={t("occupationPlaceholder")} />
+          <Field label={t("occupation")} value={occupation} onChangeText={setOccupation} placeholder={t("occupationPlaceholder")} textAlign={textAlign} />
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{t("maritalStatus")}</Text>
@@ -157,16 +164,16 @@ export default function NewPatientScreen() {
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>
             {isRTL ? "المقاسات الجسدية" : "Body Measurements"}
           </Text>
-          <Field label={t("weight")} value={weight} onChangeText={setWeight} placeholder={t("weightPlaceholder")} keyboardType="numeric" />
-          <Field label={t("height")} value={height} onChangeText={setHeight} placeholder={t("heightPlaceholder")} keyboardType="numeric" />
+          <Field label={t("weight")} value={weight} onChangeText={setWeight} placeholder={t("weightPlaceholder")} keyboardType="numeric" textAlign={textAlign} />
+          <Field label={t("height")} value={height} onChangeText={setHeight} placeholder={t("heightPlaceholder")} keyboardType="numeric" textAlign={textAlign} />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>
             {isRTL ? "بيانات الاتصال" : "Contact Details"}
           </Text>
-          <Field label={t("email")} value={email} onChangeText={setEmail} placeholder={isRTL ? "اختياري" : "optional"} keyboardType="email-address" />
-          <Field label={isRTL ? "الهاتف" : "Phone"} value={phone} onChangeText={setPhone} placeholder={isRTL ? "اختياري" : "optional"} keyboardType="phone-pad" />
+          <Field label={t("email")} value={email} onChangeText={setEmail} placeholder={isRTL ? "اختياري" : "optional"} keyboardType="email-address" textAlign={textAlign} />
+          <Field label={isRTL ? "الهاتف" : "Phone"} value={phone} onChangeText={setPhone} placeholder={isRTL ? "اختياري" : "optional"} keyboardType="phone-pad" textAlign={textAlign} />
         </View>
       </ScrollView>
 
