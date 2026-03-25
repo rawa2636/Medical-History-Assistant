@@ -98,14 +98,24 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.doctorBtn, { borderColor: C.border }]}
+            style={[styles.iconBtn, { borderColor: C.border }]}
             onPress={() => {
               Haptics.selectionAsync();
-              router.push("/case/doctor/1" as any);
+              router.push("/admin" as any);
             }}
             activeOpacity={0.7}
           >
-            <Feather name="user-check" size={18} color={C.primary} />
+            <Feather name="settings" size={18} color={C.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, { borderColor: C.border }]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              router.push("/register" as any);
+            }}
+            activeOpacity={0.7}
+          >
+            <Feather name="user-plus" size={18} color={C.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: C.primary }]}
@@ -185,7 +195,7 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: "center",
   },
-  doctorBtn: {
+  iconBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,

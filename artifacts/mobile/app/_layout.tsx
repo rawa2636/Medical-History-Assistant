@@ -34,6 +34,13 @@ function RootLayoutNav() {
       <Stack.Screen name="case/interview/[caseId]" />
       <Stack.Screen name="case/report/[caseId]" />
       <Stack.Screen name="case/doctor/[caseId]" />
+      <Stack.Screen name="register/index" />
+      <Stack.Screen name="register/doctor" />
+      <Stack.Screen name="register/student" />
+      <Stack.Screen name="admin/index" />
+      <Stack.Screen name="admin/doctors" />
+      <Stack.Screen name="admin/students" />
+      <Stack.Screen name="admin/universities" />
     </Stack>
   );
 }

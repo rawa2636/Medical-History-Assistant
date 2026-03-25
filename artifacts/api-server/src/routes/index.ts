@@ -5,6 +5,7 @@ import casesRouter from "./hakim/cases";
 import interviewRouter from "./hakim/interview";
 import reportsRouter from "./hakim/reports";
 import doctorRouter from "./hakim/doctor";
+import registrationRouter from "./hakim/registration";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use("/cases", casesRouter);
 router.use("/cases", interviewRouter);
 router.use("/cases", reportsRouter);
 router.use("/cases", doctorRouter);
+router.use("/registration", registrationRouter);
 
 export default router;
