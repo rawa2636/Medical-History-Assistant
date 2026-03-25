@@ -16,48 +16,61 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { endpoints } from "@/constants/api";
+import { SYMPTOM_SYSTEMS } from "@/constants/symptoms";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
 interface Complaint {
   symptom: string;
+  symptomAr: string;
   duration: string;
 }
 
 export default function ChiefComplaintsScreen() {
   const { caseId, symptoms: symptomsParam } = useLocalSearchParams<{ caseId: string; symptoms?: string }>();
   const insets = useSafeAreaInsets();
+  const { t, isRTL, language } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const textAlign = isRTL ? "right" : "left";
 
-  const allSymptoms: string[] = React.useMemo(() => {
+  const allSymptomPairs: { en: string; ar: string }[] = React.useMemo(() => {
     if (!symptomsParam) return [];
     try {
-      const parsed = JSON.parse(symptomsParam);
-      return Object.values(parsed).flat() as string[];
+      const parsed = JSON.parse(symptomsParam) as Record<string, string[]>;
+      return Object.entries(parsed).flatMap(([systemId, englishSymptoms]) => {
+        const system = SYMPTOM_SYSTEMS.find((s) => s.id === systemId);
+        return (englishSymptoms as string[]).map((en) => {
+          const idx = system?.symptoms.indexOf(en) ?? -1;
+          const ar = idx >= 0 ? (system?.symptomsAr[idx] ?? en) : en;
+          return { en, ar };
+        });
+      });
     } catch {
       return [];
     }
   }, [symptomsParam]);
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [selectedSymptom, setSelectedSymptom] = useState<string | null>(null);
+  const [selectedSymptomEn, setSelectedSymptomEn] = useState<string | null>(null);
   const [duration, setDuration] = useState("");
   const [saving, setSaving] = useState(false);
 
   function addComplaint() {
-    if (!selectedSymptom || !duration.trim()) return;
+    if (!selectedSymptomEn || !duration.trim()) return;
     if (complaints.length >= 3) {
-      Alert.alert("Maximum reached", "You can select up to 3 chief complaints.");
+      Alert.alert(t("maxComplaints"), t("maxComplaintsMsg"));
       return;
     }
-    if (complaints.find((c) => c.symptom === selectedSymptom)) {
-      Alert.alert("Already added", "This symptom has already been added as a chief complaint.");
+    if (complaints.find((c) => c.symptom === selectedSymptomEn)) {
+      Alert.alert(t("alreadyAdded"), t("alreadyAddedMsg"));
       return;
     }
     Haptics.selectionAsync();
-    setComplaints((prev) => [...prev, { symptom: selectedSymptom, duration: duration.trim() }]);
-    setSelectedSymptom(null);
+    const pair = allSymptomPairs.find((p) => p.en === selectedSymptomEn);
+    setComplaints((prev) => [...prev, { symptom: selectedSymptomEn, symptomAr: pair?.ar ?? selectedSymptomEn, duration: duration.trim() }]);
+    setSelectedSymptomEn(null);
     setDuration("");
   }
 
@@ -68,25 +81,21 @@ export default function ChiefComplaintsScreen() {
 
   async function handleNext() {
     if (complaints.length === 0) {
-      Alert.alert("No complaints", "Please select at least one chief complaint.");
+      Alert.alert(t("noComplaints"), t("selectAtLeastOneComplaint"));
       return;
     }
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
-
     try {
+      const apiComplaints = complaints.map((c) => ({ symptom: c.symptom, symptomAr: c.symptomAr, duration: c.duration }));
       const res = await fetch(endpoints.caseComplaints(parseInt(caseId)), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ complaints }),
+        body: JSON.stringify({ complaints: apiComplaints }),
       });
-
       if (!res.ok) throw new Error("Failed to save");
-
-      const startRes = await fetch(endpoints.interviewStart(parseInt(caseId)), { method: "POST" });
+      const startRes = await fetch(endpoints.interviewStart(parseInt(caseId)), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ language }) });
       if (!startRes.ok) throw new Error("Failed to start interview");
-
       router.push({ pathname: "/case/interview/[caseId]", params: { caseId } });
     } catch {
       Alert.alert("Error", "Failed to proceed. Please try again.");
@@ -95,17 +104,17 @@ export default function ChiefComplaintsScreen() {
     }
   }
 
-  const availableSymptoms = allSymptoms.filter((s) => !complaints.find((c) => c.symptom === s));
+  const availableSymptomPairs = allSymptomPairs.filter((p) => !complaints.find((c) => c.symptom === p.en));
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
+      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={C.text} />
+          <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerStep, { color: C.primary }]}>Step 2 of 3</Text>
-          <Text style={[styles.headerTitle, { color: C.text }]}>Chief Complaints</Text>
+          <Text style={[styles.headerStep, { color: C.primary }]}>{t("step2of3")}</Text>
+          <Text style={[styles.headerTitle, { color: C.text }]}>{t("chiefComplaints")}</Text>
         </View>
         <View style={{ width: 36 }} />
       </View>
@@ -114,33 +123,21 @@ export default function ChiefComplaintsScreen() {
         <View style={[styles.progressFill, { width: "66%", backgroundColor: C.primary }]} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={[styles.infoCard, { backgroundColor: C.primary + "10", borderColor: C.primary + "30" }]}>
-          <Feather name="info" size={16} color={C.primary} />
-          <Text style={[styles.infoText, { color: C.primary }]}>
-            Select up to 3 main symptoms that prompted this visit, and specify how long each has been present.
-          </Text>
-        </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.instruction, { color: C.textSecondary, textAlign }]}>{t("complaintsInstruction")}</Text>
 
         {complaints.length > 0 && (
-          <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>Selected Complaints</Text>
+          <View style={[styles.card, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+            <Text style={[styles.cardTitle, { color: C.text, textAlign }]}>{t("chiefComplaintsTitle")}</Text>
             {complaints.map((c, idx) => (
-              <View key={idx} style={[styles.complaintItem, { backgroundColor: C.backgroundTertiary }]}>
-                <View style={[styles.complaintNumber, { backgroundColor: C.primary }]}>
-                  <Text style={styles.complaintNumberText}>{idx + 1}</Text>
-                </View>
-                <View style={styles.complaintContent}>
-                  <Text style={[styles.complaintSymptom, { color: C.text }]}>{c.symptom}</Text>
-                  <Text style={[styles.complaintDuration, { color: C.textSecondary }]}>Duration: {c.duration}</Text>
+              <View key={idx} style={[styles.complaintRow, { backgroundColor: C.primary + "10", flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                <View style={[styles.complaintDot, { backgroundColor: C.primary }]} />
+                <View style={[styles.complaintContent, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                  <Text style={[styles.complaintSymptom, { color: C.text }]}>{language === "ar" ? c.symptomAr : c.symptom}</Text>
+                  <Text style={[styles.complaintDuration, { color: C.textSecondary }]}>{c.duration}</Text>
                 </View>
                 <TouchableOpacity onPress={() => removeComplaint(idx)} style={styles.removeBtn}>
-                  <Feather name="x" size={16} color={C.textTertiary} />
+                  <Feather name="x" size={16} color={C.textSecondary} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -148,101 +145,58 @@ export default function ChiefComplaintsScreen() {
         )}
 
         {complaints.length < 3 && (
-          <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>
-              Add Complaint {complaints.length + 1}
-              {complaints.length === 0 ? " (Primary)" : " (Optional)"}
-            </Text>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>Select Symptom</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.symptomScroll}>
-                <View style={styles.symptomChips}>
-                  {availableSymptoms.length === 0 ? (
-                    <Text style={[styles.noSymptoms, { color: C.textTertiary }]}>No more symptoms available</Text>
-                  ) : (
-                    availableSymptoms.map((s) => (
-                      <TouchableOpacity
-                        key={s}
-                        style={[
-                          styles.symptomChip,
-                          {
-                            backgroundColor: selectedSymptom === s ? C.primary : C.backgroundTertiary,
-                            borderColor: selectedSymptom === s ? C.primary : "transparent",
-                          },
-                        ]}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setSelectedSymptom(selectedSymptom === s ? null : s);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.symptomChipText, { color: selectedSymptom === s ? "#fff" : C.text }]}>
-                          {s}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
-              </ScrollView>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>Duration</Text>
-              <View style={styles.durationRow}>
-                <TextInput
-                  style={[styles.durationInput, { borderColor: C.border, backgroundColor: C.backgroundTertiary, color: C.text }]}
-                  value={duration}
-                  onChangeText={setDuration}
-                  placeholder="e.g. 3 days, 2 weeks"
-                  placeholderTextColor={C.textTertiary}
-                  returnKeyType="done"
-                />
+          <View style={[styles.card, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+            <Text style={[styles.cardTitle, { color: C.text, textAlign }]}>{t("selectSymptom")}</Text>
+            <View style={styles.symptomGrid}>
+              {availableSymptomPairs.map((pair) => (
                 <TouchableOpacity
-                  style={[
-                    styles.addBtn,
-                    {
-                      backgroundColor: selectedSymptom && duration ? C.primary : C.backgroundTertiary,
-                      opacity: selectedSymptom && duration ? 1 : 0.5,
-                    },
-                  ]}
-                  onPress={addComplaint}
-                  disabled={!selectedSymptom || !duration.trim()}
+                  key={pair.en}
+                  style={[styles.symptomChip, { backgroundColor: selectedSymptomEn === pair.en ? C.primary + "15" : C.background, borderColor: selectedSymptomEn === pair.en ? C.primary : C.border }]}
+                  onPress={() => { Haptics.selectionAsync(); setSelectedSymptomEn(selectedSymptomEn === pair.en ? null : pair.en); }}
                   activeOpacity={0.7}
                 >
-                  <Feather name="plus" size={20} color={selectedSymptom && duration ? "#fff" : C.textTertiary} />
+                  <Text style={[styles.symptomChipText, { color: selectedSymptomEn === pair.en ? C.primary : C.textSecondary }]}>
+                    {language === "ar" ? pair.ar : pair.en}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-              <View style={styles.durationSuggestions}>
-                {["1 day", "3 days", "1 week", "2 weeks", "1 month"].map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[styles.durationChip, { backgroundColor: C.backgroundTertiary }]}
-                    onPress={() => setDuration(d)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, { color: C.textSecondary }]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              ))}
             </View>
+
+            {selectedSymptomEn && (
+              <>
+                <Text style={[styles.durationLabel, { color: C.textSecondary, textAlign }]}>{t("durationLabel")}</Text>
+                <View style={[styles.durationRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  <TextInput
+                    style={[styles.durationInput, { color: C.text, borderColor: C.border, backgroundColor: C.background, flex: 1, textAlign }]}
+                    value={duration}
+                    onChangeText={setDuration}
+                    placeholder={t("durationPlaceholder")}
+                    placeholderTextColor={C.textTertiary}
+                    returnKeyType="done"
+                    onSubmitEditing={addComplaint}
+                  />
+                  <TouchableOpacity style={[styles.addBtn, { backgroundColor: C.primary }]} onPress={addComplaint} activeOpacity={0.8}>
+                    <Feather name="plus" size={18} color="#fff" />
+                    <Text style={styles.addBtnText}>{t("addComplaint")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border }]}>
         <TouchableOpacity
-          style={[styles.nextBtn, { backgroundColor: C.primary, opacity: saving || complaints.length === 0 ? 0.6 : 1 }]}
+          style={[styles.nextBtn, { backgroundColor: C.primary, opacity: (saving || complaints.length === 0) ? 0.6 : 1, flexDirection: isRTL ? "row-reverse" : "row" }]}
           onPress={handleNext}
           disabled={saving || complaints.length === 0}
           activeOpacity={0.85}
         >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
+          {saving ? <ActivityIndicator color="#fff" /> : (
             <>
-              <Text style={styles.nextBtnText}>Start AI Interview</Text>
-              <Feather name="message-circle" size={18} color="#fff" />
+              <Text style={styles.nextBtnText}>{t("next")}</Text>
+              <Feather name={isRTL ? "arrow-left" : "arrow-right"} size={18} color="#fff" />
             </>
           )}
         </TouchableOpacity>
@@ -253,14 +207,7 @@ export default function ChiefComplaintsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
+  header: { alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerCenter: { alignItems: "center" },
   headerStep: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.8 },
@@ -269,38 +216,24 @@ const styles = StyleSheet.create({
   progressFill: { height: 3 },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 12 },
-  infoCard: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 12, borderWidth: 1, alignItems: "flex-start" },
-  infoText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 18 },
-  section: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
-  sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  complaintItem: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 12, gap: 12 },
-  complaintNumber: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  complaintNumberText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff" },
+  instruction: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  card: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 12 },
+  cardTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  complaintRow: { alignItems: "center", gap: 10, padding: 10, borderRadius: 10 },
+  complaintDot: { width: 8, height: 8, borderRadius: 4 },
   complaintContent: { flex: 1 },
-  complaintSymptom: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  complaintSymptom: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   complaintDuration: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  removeBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  field: { gap: 8 },
-  label: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  symptomScroll: { marginHorizontal: -4 },
-  symptomChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 4 },
-  noSymptoms: { fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic" },
+  removeBtn: { padding: 4 },
+  symptomGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   symptomChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   symptomChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  durationRow: { flexDirection: "row", gap: 8 },
-  durationInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, fontFamily: "Inter_400Regular" },
-  addBtn: { width: 46, height: 46, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  durationSuggestions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  durationChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 },
-  durationChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  durationLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  durationRow: { gap: 8, alignItems: "center" },
+  durationInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, fontFamily: "Inter_400Regular" },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
+  addBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
   footer: { paddingTop: 12, paddingHorizontal: 16, borderTopWidth: 1 },
-  nextBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: 14,
-  },
+  nextBtn: { alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15, borderRadius: 14 },
   nextBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

@@ -13,11 +13,14 @@ import { requireAuth } from "./auth";
 
 const router: IRouter = Router();
 
-// ─── Patient: Submit consultation request ──────────────────────────────────
+// ─── Submit consultation request (doctors, students, patients) ─────────────
 router.post("/", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
-    if (user.role !== "patient") return res.status(403).json({ error: "Patients only" });
+    const allowedRoles = ["patient", "doctor", "student", "admin"];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ error: "Not authorized to submit consultations" });
+    }
 
     const { caseId, consultationType, patientNote } = req.body;
     if (!caseId || !consultationType) {
@@ -29,10 +32,10 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid consultation type" });
     }
 
-    // Verify the case belongs to this patient
+    // Verify the case exists
     const [caseRecord] = await db.select().from(casesTable).where(eq(casesTable.id, caseId));
-    if (!caseRecord || caseRecord.patientId !== user.id) {
-      return res.status(403).json({ error: "Case not found or does not belong to you" });
+    if (!caseRecord) {
+      return res.status(404).json({ error: "Case not found" });
     }
 
     // Verify the case has a report

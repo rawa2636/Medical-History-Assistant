@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,92 +8,243 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Modal,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { endpoints } from "@/constants/api";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
-interface Report {
+interface CaseReport {
   id: number;
-  caseId: number;
-  patientInfo: { name: string; age: number | null; gender: string | null; occupation: string | null };
-  chiefComplaint: string | null;
-  hpi: string | null;
-  ros: string | null;
-  pmh: string | null;
-  drugHistory: string | null;
-  allergyHistory: string | null;
-  familyHistory: string | null;
-  socialHistory: string | null;
-  summary: string | null;
-  generatedAt: string;
+  patientName: string;
+  patientAge: number | null;
+  patientGender: string | null;
+  chiefComplaints: string;
+  historyOfPresentIllness: string;
+  reviewOfSystems: string;
+  pastMedicalHistory: string;
+  familyHistory: string;
+  socialHistory: string;
+  medicationsAllergies: string;
+  physicalExamination: string;
+  assessment: string;
+  plan: string;
+  createdAt: string;
 }
 
-function ReportSection({ title, icon, content, color }: { title: string; icon: string; content: string | null; color?: string }) {
-  const [expanded, setExpanded] = useState(true);
-  if (!content) return null;
+function Section({ title, content }: { title: string; content: string }) {
+  if (!content || content.trim() === "N/A" || content.trim() === "") return null;
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: C.primary }]}>{title}</Text>
+      <Text style={[styles.sectionContent, { color: C.text }]}>{content}</Text>
+    </View>
+  );
+}
+
+function SendCaseModal({
+  visible,
+  caseId,
+  onClose,
+  t,
+  isRTL,
+}: {
+  visible: boolean;
+  caseId: string;
+  onClose: () => void;
+  t: (k: string) => string;
+  isRTL: boolean;
+}) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+
+  const options = [
+    { id: "free_student", icon: "book-open", color: "#805AD5", label: t("sendFreeStudent"), desc: t("sendFreeStudentDesc") },
+    { id: "free_doctor", icon: "user-check", color: C.primary, label: t("sendFreeDoctor"), desc: t("sendFreeDoctorDesc") },
+    { id: "paid", icon: "star", color: "#E59F00", label: t("sendPaid"), desc: t("sendPaidDesc") },
+  ];
+
+  async function handleSend() {
+    if (!selectedType) return;
+    setSending(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const res = await fetch(endpoints.consultations, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId: parseInt(caseId), consultationType: selectedType }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setSent(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Error", "Failed to send case. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
-    <View style={[styles.reportSection, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
-      <TouchableOpacity
-        style={styles.reportSectionHeader}
-        onPress={() => {
-          Haptics.selectionAsync();
-          setExpanded((p) => !p);
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.sectionIcon, { backgroundColor: (color || C.primary) + "20" }]}>
-          <Feather name={icon as any} size={16} color={color || C.primary} />
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalSheet, { backgroundColor: C.background }]}>
+          <View style={[styles.modalHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Text style={[styles.modalTitle, { color: C.text }]}>{t("sendCase")}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Feather name="x" size={20} color={C.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {sent ? (
+            <View style={styles.sentContainer}>
+              <View style={[styles.sentIcon, { backgroundColor: C.success + "20" }]}>
+                <Feather name="check-circle" size={40} color={C.success} />
+              </View>
+              <Text style={[styles.sentTitle, { color: C.text }]}>{t("caseSentTitle")}</Text>
+              <Text style={[styles.sentDesc, { color: C.textSecondary, textAlign: "center" }]}>{t("caseSentDesc")}</Text>
+              <TouchableOpacity style={[styles.doneBtn, { backgroundColor: C.primary }]} onPress={onClose}>
+                <Text style={styles.doneBtnText}>{t("done")}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={[styles.modalDesc, { color: C.textSecondary, textAlign: isRTL ? "right" : "left" }]}>{t("sendCaseDesc")}</Text>
+              <View style={styles.consultOptions}>
+                {options.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.consultOption, { borderColor: selectedType === opt.id ? opt.color : C.border, backgroundColor: selectedType === opt.id ? opt.color + "10" : C.backgroundSecondary }]}
+                    onPress={() => { Haptics.selectionAsync(); setSelectedType(opt.id); }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.consultOptionIcon, { backgroundColor: opt.color + "20" }]}>
+                      <Feather name={opt.icon as any} size={22} color={opt.color} />
+                    </View>
+                    <View style={[styles.consultOptionText, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                      <Text style={[styles.consultOptionLabel, { color: C.text }]}>{opt.label}</Text>
+                      <Text style={[styles.consultOptionDesc, { color: C.textSecondary }]}>{opt.desc}</Text>
+                    </View>
+                    {selectedType === opt.id && (
+                      <View style={[styles.checkCircle, { backgroundColor: opt.color }]}>
+                        <Feather name="check" size={12} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.sendBtn, { backgroundColor: C.primary, opacity: (!selectedType || sending) ? 0.6 : 1 }]}
+                onPress={handleSend}
+                disabled={!selectedType || sending}
+                activeOpacity={0.85}
+              >
+                {sending ? <ActivityIndicator color="#fff" /> : (
+                  <Text style={styles.sendBtnText}>{t("sendNow")}</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-        <Text style={[styles.sectionHeaderText, { color: C.text }]}>{title}</Text>
-        <Feather name={expanded ? "chevron-up" : "chevron-down"} size={18} color={C.textTertiary} />
-      </TouchableOpacity>
-      {expanded && (
-        <Text style={[styles.sectionContent, { color: C.textSecondary }]}>{content}</Text>
-      )}
-    </View>
+      </View>
+    </Modal>
   );
 }
 
 export default function ReportScreen() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
   const insets = useSafeAreaInsets();
+  const { t, isRTL } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const [generating, setGenerating] = useState(false);
 
-  const { data: report, isLoading, error, refetch } = useQuery<Report>({
-    queryKey: ["report", caseId],
-    queryFn: async () => {
-      const res = await fetch(endpoints.report(parseInt(caseId)));
-      if (!res.ok) throw new Error("Report not found");
-      return res.json();
-    },
-    retry: false,
-  });
+  const [report, setReport] = useState<CaseReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
 
-  async function handleGenerate() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    setGenerating(true);
+  useEffect(() => { loadReport(); }, []);
+
+  async function loadReport() {
     try {
-      const res = await fetch(endpoints.generateReport(parseInt(caseId)), { method: "POST" });
-      if (!res.ok) throw new Error("Failed to generate");
-      refetch();
+      const res = await fetch(endpoints.case(parseInt(caseId)));
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setReport(data.report || null);
     } catch {
-      Alert.alert("Error", "Failed to generate report. Please try again.");
+      Alert.alert("Error", "Failed to load report.");
     } finally {
-      setGenerating(false);
+      setLoading(false);
     }
   }
 
-  if (isLoading) {
+  async function handleDownloadPDF() {
+    if (!report) return;
+    setDownloading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
+  h1 { color: #1A6B5E; font-size: 24px; margin-bottom: 4px; }
+  .subtitle { color: #6B7280; font-size: 14px; margin-bottom: 24px; border-bottom: 2px solid #1A6B5E; padding-bottom: 12px; }
+  .patient-info { background: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+  .patient-info p { margin: 4px 0; font-size: 14px; }
+  .patient-info strong { color: #1A6B5E; }
+  h2 { color: #1A6B5E; font-size: 16px; margin-top: 20px; margin-bottom: 6px; border-left: 4px solid #1A6B5E; padding-left: 10px; }
+  p { font-size: 14px; line-height: 1.6; margin: 0; }
+  .footer { margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 12px; color: #9ca3af; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>Hakim — Medical History Report</h1>
+  <div class="subtitle">AI-Assisted Medical History Taking — ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
+  <div class="patient-info">
+    <p><strong>Patient:</strong> ${report.patientName}</p>
+    ${report.patientAge ? `<p><strong>Age:</strong> ${report.patientAge}</p>` : ""}
+    ${report.patientGender ? `<p><strong>Gender:</strong> ${report.patientGender}</p>` : ""}
+    <p><strong>Date:</strong> ${new Date(report.createdAt).toLocaleDateString()}</p>
+  </div>
+  ${report.chiefComplaints ? `<h2>Chief Complaints</h2><p>${report.chiefComplaints.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.historyOfPresentIllness ? `<h2>History of Present Illness</h2><p>${report.historyOfPresentIllness.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.reviewOfSystems ? `<h2>Review of Systems</h2><p>${report.reviewOfSystems.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.pastMedicalHistory ? `<h2>Past Medical History</h2><p>${report.pastMedicalHistory.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.familyHistory ? `<h2>Family History</h2><p>${report.familyHistory.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.socialHistory ? `<h2>Social History</h2><p>${report.socialHistory.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.medicationsAllergies ? `<h2>Medications & Allergies</h2><p>${report.medicationsAllergies.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.assessment ? `<h2>Assessment</h2><p>${report.assessment.replace(/\n/g, "<br>")}</p>` : ""}
+  ${report.plan ? `<h2>Plan</h2><p>${report.plan.replace(/\n/g, "<br>")}</p>` : ""}
+  <div class="footer">Generated by Hakim Medical Assistant · For educational and informational purposes only.</div>
+</body>
+</html>`;
+
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Medical History Report" });
+      } else {
+        Alert.alert("PDF saved", `Saved to: ${uri}`);
+      }
+    } catch (err) {
+      Alert.alert("Error", "Failed to generate PDF.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: C.background }]}>
         <ActivityIndicator size="large" color={C.primary} />
@@ -101,202 +252,153 @@ export default function ReportScreen() {
     );
   }
 
-  if (error || !report) {
+  if (!report) {
     return (
-      <View style={[styles.container, { backgroundColor: C.background }]}>
-        <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={22} color={C.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: C.text }]}>Medical Report</Text>
-          <View style={{ width: 36 }} />
-        </View>
-        <View style={[styles.center, { flex: 1 }]}>
-          <View style={[styles.noReportIcon, { backgroundColor: C.primary + "15" }]}>
-            <Feather name="file-text" size={36} color={C.primary} />
-          </View>
-          <Text style={[styles.noReportTitle, { color: C.text }]}>No Report Yet</Text>
-          <Text style={[styles.noReportSubtitle, { color: C.textSecondary }]}>
-            Complete the interview first, then generate a structured medical history report.
-          </Text>
-          <TouchableOpacity
-            style={[styles.generateBtn, { backgroundColor: C.primary, opacity: generating ? 0.7 : 1 }]}
-            onPress={handleGenerate}
-            disabled={generating}
-            activeOpacity={0.85}
-          >
-            {generating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Feather name="zap" size={18} color="#fff" />
-                <Text style={styles.generateBtnText}>Generate Report</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.center, { backgroundColor: C.background }]}>
+        <Text style={{ color: C.textSecondary }}>{t("noReport")}</Text>
       </View>
     );
   }
 
-  const date = new Date(report.generatedAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
+      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={C.text} />
+          <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: C.text }]}>Medical Report</Text>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: C.text }]}>{t("medicalReport")}</Text>
+          <Text style={[styles.headerSub, { color: C.textSecondary }]}>{report.patientName}</Text>
+        </View>
         <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.push({ pathname: "/case/doctor/[caseId]", params: { caseId } })}
+          style={[styles.iconBtn, { borderColor: C.border }]}
+          onPress={handleDownloadPDF}
+          disabled={downloading}
+          activeOpacity={0.7}
         >
-          <Feather name="user-check" size={18} color={C.primary} />
+          {downloading ? (
+            <ActivityIndicator size="small" color={C.primary} />
+          ) : (
+            <Feather name="download" size={18} color={C.primary} />
+          )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 24 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.reportHeader, { backgroundColor: C.primary, borderColor: C.primaryDark }]}>
-          <View style={styles.reportHeaderTop}>
-            <View>
-              <Text style={styles.reportHeaderName}>{report.patientInfo?.name || "Patient"}</Text>
-              <View style={styles.reportHeaderMeta}>
-                {report.patientInfo?.age && (
-                  <Text style={styles.reportHeaderMetaText}>{report.patientInfo.age}y</Text>
-                )}
-                {report.patientInfo?.gender && (
-                  <Text style={styles.reportHeaderMetaText}>{report.patientInfo.gender}</Text>
-                )}
-                {report.patientInfo?.occupation && (
-                  <Text style={styles.reportHeaderMetaText}>{report.patientInfo.occupation}</Text>
-                )}
-              </View>
-            </View>
-            <View style={[styles.reportBadge, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
-              <Text style={styles.reportBadgeText}>Medical History</Text>
-            </View>
-          </View>
-          <Text style={styles.reportDate}>Generated: {date}</Text>
-          <View style={[styles.disclaimer, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
-            <Feather name="alert-circle" size={14} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.disclaimerText}>
-              This is a history report only. No diagnosis or treatment recommendations are included.
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 120 }]} showsVerticalScrollIndicator={false}>
+        <View style={[styles.reportCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+          <View style={[styles.reportHeader, { backgroundColor: C.primary + "12", borderRadius: 10, padding: 14, marginBottom: 16 }]}>
+            <Text style={[styles.reportTitle, { color: C.primary }]}>Hakim — Medical History Report</Text>
+            <Text style={[styles.reportDate, { color: C.textSecondary }]}>
+              {new Date(report.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
             </Text>
+            <View style={[styles.patientChips, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={[styles.chip, { backgroundColor: C.primary + "20" }]}>
+                <Text style={[styles.chipText, { color: C.primary }]}>{report.patientName}</Text>
+              </View>
+              {report.patientAge && (
+                <View style={[styles.chip, { backgroundColor: C.backgroundTertiary }]}>
+                  <Text style={[styles.chipText, { color: C.textSecondary }]}>{report.patientAge} yrs</Text>
+                </View>
+              )}
+              {report.patientGender && (
+                <View style={[styles.chip, { backgroundColor: C.backgroundTertiary }]}>
+                  <Text style={[styles.chipText, { color: C.textSecondary }]}>{report.patientGender}</Text>
+                </View>
+              )}
+            </View>
           </View>
+
+          <Section title="Chief Complaints" content={report.chiefComplaints} />
+          <Section title="History of Present Illness" content={report.historyOfPresentIllness} />
+          <Section title="Review of Systems" content={report.reviewOfSystems} />
+          <Section title="Past Medical History" content={report.pastMedicalHistory} />
+          <Section title="Family History" content={report.familyHistory} />
+          <Section title="Social History" content={report.socialHistory} />
+          <Section title="Medications & Allergies" content={report.medicationsAllergies} />
+          <Section title="Assessment" content={report.assessment} />
+          <Section title="Plan" content={report.plan} />
+
+          <Text style={[styles.disclaimer, { color: C.textTertiary }]}>
+            {t("reportDisclaimer")}
+          </Text>
         </View>
-
-        {report.summary && (
-          <View style={[styles.summaryCard, { backgroundColor: C.success + "10", borderColor: C.success + "30" }]}>
-            <Text style={[styles.summaryLabel, { color: C.success }]}>Summary for Physician</Text>
-            <Text style={[styles.summaryText, { color: C.text }]}>{report.summary}</Text>
-          </View>
-        )}
-
-        <ReportSection title="Chief Complaint" icon="alert-circle" content={report.chiefComplaint} color="#E53E3E" />
-        <ReportSection title="History of Present Illness" icon="clock" content={report.hpi} />
-        <ReportSection title="Review of Systems" icon="list" content={report.ros} color="#3182CE" />
-        <ReportSection title="Past Medical History" icon="archive" content={report.pmh} color="#805AD5" />
-        <ReportSection title="Drug History" icon="package" content={report.drugHistory} color="#D69E2E" />
-        <ReportSection title="Allergy History" icon="alert-triangle" content={report.allergyHistory} color="#E53E3E" />
-        <ReportSection title="Family History" icon="users" content={report.familyHistory} color="#38A169" />
-        <ReportSection title="Social History" icon="coffee" content={report.socialHistory} color="#718096" />
-
-        <TouchableOpacity
-          style={[styles.regenerateBtn, { borderColor: C.border }]}
-          onPress={handleGenerate}
-          disabled={generating}
-          activeOpacity={0.7}
-        >
-          {generating ? (
-            <ActivityIndicator size="small" color={C.primary} />
-          ) : (
-            <>
-              <Feather name="refresh-cw" size={16} color={C.primary} />
-              <Text style={[styles.regenerateBtnText, { color: C.primary }]}>Regenerate Report</Text>
-            </>
-          )}
-        </TouchableOpacity>
       </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+        <TouchableOpacity
+          style={[styles.footerBtn, { backgroundColor: C.primary + "12", borderColor: C.primary + "30", flex: 1 }]}
+          onPress={handleDownloadPDF}
+          disabled={downloading}
+          activeOpacity={0.8}
+        >
+          <Feather name="download" size={18} color={C.primary} />
+          <Text style={[styles.footerBtnText, { color: C.primary }]}>{t("downloadPDF")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.footerBtn, { backgroundColor: C.primary, flex: 1 }]}
+          onPress={() => { Haptics.selectionAsync(); setShowSendModal(true); }}
+          activeOpacity={0.85}
+        >
+          <Feather name="send" size={18} color="#fff" />
+          <Text style={[styles.footerBtnText, { color: "#fff" }]}>{t("sendCase")}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <SendCaseModal
+        visible={showSendModal}
+        caseId={caseId}
+        onClose={() => setShowSendModal(false)}
+        t={t}
+        isRTL={isRTL}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 32 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  header: { alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  headerCenter: { alignItems: "center" },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
   scroll: { flex: 1 },
-  content: { padding: 16, gap: 10 },
-  reportHeader: {
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-    marginBottom: 2,
-  },
-  reportHeaderTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  reportHeaderName: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff" },
-  reportHeaderMeta: { flexDirection: "row", gap: 8, marginTop: 4 },
-  reportHeaderMetaText: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)" },
-  reportBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  reportBadgeText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#fff" },
-  reportDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)" },
-  disclaimer: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 10, borderRadius: 10 },
-  disclaimerText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.9)", flex: 1, lineHeight: 16 },
-  summaryCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-  },
-  summaryLabel: { fontSize: 12, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.8 },
-  summaryText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 21 },
-  reportSection: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  reportSectionHeader: { flexDirection: "row", alignItems: "center", padding: 14, gap: 10 },
-  sectionIcon: { width: 34, height: 34, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  sectionHeaderText: { flex: 1, fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  sectionContent: { paddingHorizontal: 14, paddingBottom: 14, fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
-  noReportIcon: { width: 80, height: 80, borderRadius: 24, alignItems: "center", justifyContent: "center" },
-  noReportTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  noReportSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
-  generateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 32,
-    borderRadius: 14,
-    marginTop: 8,
-  },
-  generateBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
-  regenerateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  regenerateBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  content: { padding: 16 },
+  reportCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 0 },
+  reportHeader: {},
+  reportTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  reportDate: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 10 },
+  patientChips: { flexWrap: "wrap", gap: 6 },
+  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  chipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  section: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#E5E7EB" },
+  sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 },
+  sectionContent: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
+  disclaimer: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 16, lineHeight: 16 },
+  footer: { paddingTop: 12, paddingHorizontal: 16, gap: 8, borderTopWidth: 1 },
+  footerBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "transparent" },
+  footerBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 },
+  modalHeader: { alignItems: "center", justifyContent: "space-between" },
+  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  closeBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  modalDesc: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  consultOptions: { gap: 10 },
+  consultOption: { flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 14, borderWidth: 1.5 },
+  consultOptionIcon: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  consultOptionText: { flex: 1 },
+  consultOptionLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  consultOptionDesc: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
+  checkCircle: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  sendBtn: { paddingVertical: 15, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  sendBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  sentContainer: { alignItems: "center", gap: 12, paddingVertical: 20 },
+  sentIcon: { width: 72, height: 72, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  sentTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  sentDesc: { fontSize: 14, fontFamily: "Inter_400Regular", maxWidth: 260, lineHeight: 20 },
+  doneBtn: { paddingHorizontal: 40, paddingVertical: 14, borderRadius: 14 },
+  doneBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

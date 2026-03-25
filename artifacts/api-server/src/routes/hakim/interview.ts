@@ -16,7 +16,7 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are Hakim, a clinical history-taking assistant. Your role is to conduct a structured medical interview with patients to collect comprehensive medical history following Davidson's Principles of Medicine.
+const SYSTEM_PROMPT_EN = `You are Hakim, a clinical history-taking assistant. Your role is to conduct a structured medical interview with patients to collect comprehensive medical history following Davidson's Principles of Medicine.
 
 CRITICAL RULES:
 - NEVER suggest diagnoses, differential diagnoses, or medical conclusions
@@ -34,6 +34,30 @@ Your goal is to gather:
 3. Any relevant triggers or exposures
 
 Keep responses concise and conversational. Do not overwhelm the patient with multiple questions at once.`;
+
+const SYSTEM_PROMPT_AR = `أنت حكيم، مساعد ذكي لأخذ التاريخ المرضي السريري. دورك إجراء مقابلة طبية منظمة مع المريض لجمع التاريخ المرضي الكامل وفق مبادئ دافيدسون للطب الداخلي.
+
+القواعد الأساسية:
+- لا تقترح أبداً أي تشخيص أو تشخيص تفريقي أو استنتاجات طبية
+- لا توصي أبداً بأدوية أو علاجات أو فحوصات
+- مهمتك جمع المعلومات فقط — أنت مساعد توثيق وليس طبيباً
+- اطرح سؤالاً واحداً واضحاً في كل مرة
+- كن متعاطفاً ومحترفاً وصبوراً
+- استخدم إطار SOCRATES لأعراض الألم: موقع الألم، بداية الألم، طبيعة الألم، الانتشار، الأعراض المصاحبة، المسار الزمني، العوامل المُعزِّزة والمخففة، الشدة
+- تابع الإجابات التي تحتاج توضيحاً
+- عندما يكتمل التاريخ المرضي، اختم رسالتك بـ [INTERVIEW_COMPLETE]
+
+هدفك جمع:
+1. تاريخ المرض الحالي — تحليل مفصّل للأعراض
+2. توضيح أي أعراض غير واضحة من مراجعة الأجهزة
+3. أي محفزات أو تعرضات ذات صلة
+
+اجعل ردودك موجزة ومحادثاتية. لا تُثقل المريض بأسئلة متعددة دفعةً واحدة.
+أجرِ المقابلة كاملةً باللغة العربية.`;
+
+function getSystemPrompt(language?: string) {
+  return language === "ar" ? SYSTEM_PROMPT_AR : SYSTEM_PROMPT_EN;
+}
 
 function buildContextPrompt(
   patient: { name: string; age: number | null; gender: string | null },
@@ -75,6 +99,7 @@ Begin the interview by greeting the patient and asking about their primary compl
 router.post("/:id/interview/start", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { language } = req.body as { language?: string };
     const [theCase] = await db.select().from(casesTable).where(eq(casesTable.id, id));
     if (!theCase) return res.status(404).json({ error: "Case not found" });
 
@@ -87,12 +112,15 @@ router.post("/:id/interview/start", async (req, res) => {
       model: "gpt-5.2",
       max_completion_tokens: 500,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: getSystemPrompt(language) },
         { role: "user", content: context },
       ],
     });
 
-    const firstMessage = completion.choices[0]?.message?.content || "Hello! Let's start your medical history. Can you tell me more about what brings you in today?";
+    const defaultGreeting = language === "ar"
+      ? "مرحباً! دعنا نبدأ بأخذ تاريخك المرضي. هل يمكنك إخباري بالتفصيل عن الشكوى الرئيسية التي أحضرتك اليوم؟"
+      : "Hello! Let's start your medical history. Can you tell me more about what brings you in today?";
+    const firstMessage = completion.choices[0]?.message?.content || defaultGreeting;
 
     const [existingSession] = await db.select().from(interviewSessionsTable).where(eq(interviewSessionsTable.caseId, id));
 
@@ -120,7 +148,7 @@ router.post("/:id/interview/start", async (req, res) => {
 router.post("/:id/interview/message", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { message: userMessage } = req.body;
+    const { message: userMessage, language } = req.body as { message: string; language?: string };
 
     const [theCase] = await db.select().from(casesTable).where(eq(casesTable.id, id));
     if (!theCase) return res.status(404).json({ error: "Case not found" });
@@ -133,7 +161,7 @@ router.post("/:id/interview/message", async (req, res) => {
     const context = buildContextPrompt(patient, profile || null, theCase as { rosSymptoms: unknown; chiefComplaints: unknown });
 
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: getSystemPrompt(language) },
       { role: "user", content: context },
       ...existingMessages.map((m) => ({
         role: m.role as "user" | "assistant",

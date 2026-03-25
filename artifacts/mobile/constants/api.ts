@@ -32,4 +32,5 @@ export const endpoints = {
   generateReport: (id: number) => `${API_BASE}/cases/${id}/generate-report`,
   report: (id: number) => `${API_BASE}/cases/${id}/report`,
   doctorReview: (id: number) => `${API_BASE}/cases/${id}/doctor-review`,
+  consultations: `${API_BASE}/consultations`,
 };

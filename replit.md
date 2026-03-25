@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Full-stack medical history assistant platform with AI-driven clinical interviews (SOCRATES framework), doctor/student registration, admin verification panel, and JWT authentication.
+pnpm workspace monorepo using TypeScript. Full-stack medical history assistant platform with AI-driven clinical interviews (SOCRATES framework), doctor/student registration, admin verification panel, JWT authentication. Full Arabic/English bilingual support with RTL layout. Medical reports always generated in English and downloadable as PDF. Cases can be sent for free (student/doctor) or paid consultation from the report screen.
 
 ## Stack
 

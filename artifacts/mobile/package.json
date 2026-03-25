@@ -56,6 +56,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
-    "expo-secure-store": "^55.0.9"
+    "expo-print": "^55.0.9",
+    "expo-secure-store": "^55.0.9",
+    "expo-sharing": "^55.0.14"
   }
 }

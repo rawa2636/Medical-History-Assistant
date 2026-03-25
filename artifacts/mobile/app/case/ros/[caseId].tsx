@@ -16,12 +16,14 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { endpoints } from "@/constants/api";
 import { SYMPTOM_SYSTEMS } from "@/constants/symptoms";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
 export default function ReviewOfSystemsScreen() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
   const insets = useSafeAreaInsets();
+  const { t, isRTL, language } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -30,35 +32,33 @@ export default function ReviewOfSystemsScreen() {
   const [expandedSystem, setExpandedSystem] = useState<string | null>(SYMPTOM_SYSTEMS[0].id);
 
   const totalSelected = Object.values(selectedSymptoms).flat().length;
+  const textAlign = isRTL ? "right" : "left";
 
-  function toggleSymptom(systemId: string, symptom: string) {
+  function toggleSymptom(systemId: string, symptomEn: string) {
     Haptics.selectionAsync();
     setSelectedSymptoms((prev) => {
       const current = prev[systemId] || [];
-      if (current.includes(symptom)) {
-        return { ...prev, [systemId]: current.filter((s) => s !== symptom) };
+      if (current.includes(symptomEn)) {
+        return { ...prev, [systemId]: current.filter((s) => s !== symptomEn) };
       } else {
-        return { ...prev, [systemId]: [...current, symptom] };
+        return { ...prev, [systemId]: [...current, symptomEn] };
       }
     });
   }
 
   async function handleNext() {
     if (totalSelected === 0) {
-      Alert.alert("No symptoms selected", "Please select at least one symptom before continuing.");
+      Alert.alert(t("noSymptomsSelected"), t("selectAtLeastOne"));
       return;
     }
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
-
     try {
       const res = await fetch(endpoints.caseRos(parseInt(caseId)), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symptoms: selectedSymptoms }),
       });
-
       if (!res.ok) throw new Error("Failed to save");
       router.push({ pathname: "/case/complaints/[caseId]", params: { caseId, symptoms: JSON.stringify(selectedSymptoms) } });
     } catch {
@@ -70,13 +70,13 @@ export default function ReviewOfSystemsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
+      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={C.text} />
+          <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerStep, { color: C.primary }]}>Step 1 of 3</Text>
-          <Text style={[styles.headerTitle, { color: C.text }]}>Review of Systems</Text>
+          <Text style={[styles.headerStep, { color: C.primary }]}>{t("step1of3")}</Text>
+          <Text style={[styles.headerTitle, { color: C.text }]}>{t("reviewOfSystems")}</Text>
         </View>
         <View style={{ width: 36 }} />
       </View>
@@ -85,33 +85,29 @@ export default function ReviewOfSystemsScreen() {
         <View style={[styles.progressFill, { width: "33%", backgroundColor: C.primary }]} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={[styles.instruction, { color: C.textSecondary }]}>
-          Select all symptoms the patient is currently experiencing:
-        </Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]} showsVerticalScrollIndicator={false}>
+        <Text style={[styles.instruction, { color: C.textSecondary, textAlign }]}>{t("rosInstruction")}</Text>
 
         {SYMPTOM_SYSTEMS.map((system) => {
           const selected = selectedSymptoms[system.id] || [];
           const isExpanded = expandedSystem === system.id;
+          const systemName = language === "ar" ? system.nameAr : system.name;
+          const symptoms = language === "ar" ? system.symptomsAr : system.symptoms;
 
           return (
             <View key={system.id} style={[styles.systemCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
               <TouchableOpacity
-                style={styles.systemHeader}
-                onPress={() => setExpandedSystem(isExpanded ? null : system.id)}
+                style={[styles.systemHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+                onPress={() => { Haptics.selectionAsync(); setExpandedSystem(isExpanded ? null : system.id); }}
                 activeOpacity={0.7}
               >
                 <View style={[styles.systemIcon, { backgroundColor: system.color + "20" }]}>
                   <Feather name={system.icon as any} size={18} color={system.color} />
                 </View>
-                <Text style={[styles.systemName, { color: C.text }]}>{system.name}</Text>
-                <View style={styles.systemRight}>
+                <Text style={[styles.systemName, { color: C.text, textAlign }]}>{systemName}</Text>
+                <View style={[styles.systemRight, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
                   {selected.length > 0 && (
-                    <View style={[styles.countBadge, { backgroundColor: C.primary }]}>
+                    <View style={[styles.countBadge, { backgroundColor: system.color }]}>
                       <Text style={styles.countBadgeText}>{selected.length}</Text>
                     </View>
                   )}
@@ -120,24 +116,25 @@ export default function ReviewOfSystemsScreen() {
               </TouchableOpacity>
 
               {isExpanded && (
-                <View style={[styles.symptomsGrid, { borderTopColor: C.borderLight }]}>
-                  {system.symptoms.map((symptom) => {
-                    const isSelected = selected.includes(symptom);
+                <View style={[styles.symptomsGrid, { borderTopColor: C.border }]}>
+                  {symptoms.map((symptom, idx) => {
+                    const englishSymptom = system.symptoms[idx];
+                    const isSelected = selected.includes(englishSymptom);
                     return (
                       <TouchableOpacity
-                        key={symptom}
+                        key={englishSymptom}
                         style={[
                           styles.symptomBtn,
                           {
-                            backgroundColor: isSelected ? C.primary : C.backgroundTertiary,
-                            borderColor: isSelected ? C.primary : "transparent",
+                            backgroundColor: isSelected ? system.color + "15" : C.background,
+                            borderColor: isSelected ? system.color : C.border,
                           },
                         ]}
-                        onPress={() => toggleSymptom(system.id, symptom)}
+                        onPress={() => toggleSymptom(system.id, englishSymptom)}
                         activeOpacity={0.7}
                       >
-                        {isSelected && <Feather name="check" size={12} color="#fff" />}
-                        <Text style={[styles.symptomText, { color: isSelected ? "#fff" : C.text }]}>
+                        {isSelected && <Feather name="check" size={12} color={system.color} />}
+                        <Text style={[styles.symptomText, { color: isSelected ? system.color : C.textSecondary }]}>
                           {symptom}
                         </Text>
                       </TouchableOpacity>
@@ -153,11 +150,11 @@ export default function ReviewOfSystemsScreen() {
       <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border }]}>
         {totalSelected > 0 && (
           <Text style={[styles.selectedCount, { color: C.textSecondary }]}>
-            {totalSelected} symptom{totalSelected !== 1 ? "s" : ""} selected
+            {isRTL ? `${totalSelected} عرض مختار` : `${totalSelected} symptom${totalSelected !== 1 ? "s" : ""} selected`}
           </Text>
         )}
         <TouchableOpacity
-          style={[styles.nextBtn, { backgroundColor: C.primary, opacity: saving ? 0.7 : 1 }]}
+          style={[styles.nextBtn, { backgroundColor: C.primary, opacity: saving ? 0.7 : 1, flexDirection: isRTL ? "row-reverse" : "row" }]}
           onPress={handleNext}
           disabled={saving}
           activeOpacity={0.85}
@@ -166,8 +163,8 @@ export default function ReviewOfSystemsScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Text style={styles.nextBtnText}>Continue to Chief Complaints</Text>
-              <Feather name="arrow-right" size={18} color="#fff" />
+              <Text style={styles.nextBtnText}>{t("next")}</Text>
+              <Feather name={isRTL ? "arrow-left" : "arrow-right"} size={18} color="#fff" />
             </>
           )}
         </TouchableOpacity>
@@ -178,14 +175,7 @@ export default function ReviewOfSystemsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
+  header: { alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerCenter: { alignItems: "center" },
   headerStep: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.8 },
@@ -196,10 +186,10 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 8 },
   instruction: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, marginBottom: 4 },
   systemCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  systemHeader: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  systemHeader: { alignItems: "center", padding: 14, gap: 12 },
   systemIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   systemName: { flex: 1, fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  systemRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  systemRight: { alignItems: "center", gap: 8 },
   countBadge: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   countBadgeText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#fff" },
   symptomsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 12, borderTopWidth: 1 },
@@ -207,13 +197,6 @@ const styles = StyleSheet.create({
   symptomText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   footer: { paddingTop: 12, paddingHorizontal: 16, gap: 8, borderTopWidth: 1 },
   selectedCount: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
-  nextBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: 14,
-  },
+  nextBtn: { alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15, borderRadius: 14 },
   nextBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

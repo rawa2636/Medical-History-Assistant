@@ -1,0 +1,451 @@
+import React, { createContext, useContext, useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { I18nManager } from "react-native";
+
+export type Language = "ar" | "en";
+
+interface LanguageContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: (key: string) => string;
+  isRTL: boolean;
+}
+
+const LanguageContext = createContext<LanguageContextType>({
+  language: "ar",
+  setLanguage: () => {},
+  t: (key) => key,
+  isRTL: true,
+});
+
+export function useLanguage() {
+  return useContext(LanguageContext);
+}
+
+const STORAGE_KEY = "hakim_language";
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [language, setLanguageState] = useState<Language>("ar");
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
+      if (saved === "ar" || saved === "en") {
+        setLanguageState(saved);
+      }
+    });
+  }, []);
+
+  const setLanguage = async (lang: Language) => {
+    setLanguageState(lang);
+    await AsyncStorage.setItem(STORAGE_KEY, lang);
+  };
+
+  const t = (key: string): string => {
+    const dict = language === "ar" ? AR : EN;
+    return (dict as Record<string, string>)[key] ?? (EN as Record<string, string>)[key] ?? key;
+  };
+
+  const isRTL = language === "ar";
+
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage, t, isRTL }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+const EN: Record<string, string> = {
+  // App
+  appName: "Hakim",
+  appSub: "Intelligent Medical Assistant",
+  // Login
+  loginAs: "Login as",
+  email: "Email",
+  password: "Password",
+  login: "Login",
+  loginLoading: "Logging in...",
+  noAccount: "Don't have an account?",
+  register: "Register",
+  fieldRequired: "Please fill in all fields",
+  loginFailed: "Login failed",
+  patient: "Patient",
+  doctor: "Doctor",
+  student: "Medical Student",
+  admin: "Admin",
+  emailHint: "Email address",
+  registeredEmail: "Registered email",
+  username: "Username",
+  showPassword: "Show password",
+  hidePassword: "Hide password",
+  // Home
+  patients: "Patients",
+  medicalAssistant: "Medical History Assistant",
+  addPatient: "Add Patient",
+  noPatients: "No patients yet",
+  noPatientsSubtitle: "Add your first patient to get started",
+  loadingPatients: "Loading patients...",
+  errorLoadingPatients: "Failed to load patients",
+  retry: "Retry",
+  logout: "Logout",
+  adminPanel: "Admin Panel",
+  // New Patient
+  newPatient: "New Patient",
+  save: "Save",
+  saving: "Saving...",
+  fullName: "Full Name",
+  fullNamePlaceholder: "Patient full name",
+  age: "Age",
+  agePlaceholder: "e.g. 35",
+  gender: "Gender",
+  male: "Male",
+  female: "Female",
+  other: "Other",
+  occupation: "Occupation",
+  occupationPlaceholder: "e.g. Teacher",
+  weight: "Weight (kg)",
+  weightPlaceholder: "e.g. 75",
+  height: "Height (cm)",
+  heightPlaceholder: "e.g. 170",
+  maritalStatus: "Marital Status",
+  single: "Single",
+  married: "Married",
+  divorced: "Divorced",
+  widowed: "Widowed",
+  nameRequired: "Patient name is required",
+  patientSaved: "Patient saved successfully",
+  // Patient Detail
+  patientDetails: "Patient Details",
+  editProfile: "Edit Profile",
+  newCase: "New Case",
+  medicalHistory: "Medical History",
+  cases: "Cases",
+  noCases: "No cases yet",
+  noCasesSubtitle: "Start a new case to begin the medical interview",
+  // Case Status
+  active: "Active",
+  interviewing: "Interviewing",
+  interviewDone: "Interview Done",
+  reportReady: "Report Ready",
+  startROS: "Start ROS",
+  continueInterview: "Continue Interview",
+  generateReport: "Generate Report",
+  viewReport: "View Report",
+  openCase: "Open Case",
+  // Profile
+  medicalBackground: "Medical Background",
+  chronicConditions: "Chronic Conditions",
+  currentMedications: "Current Medications",
+  allergies: "Allergies",
+  surgicalHistory: "Surgical History",
+  familyHistory: "Family History",
+  smokingStatus: "Smoking Status",
+  alcoholUse: "Alcohol Use",
+  addCondition: "Add condition",
+  addMedication: "Add medication",
+  addAllergy: "Add allergy",
+  addSurgery: "Add surgery",
+  addFamilyHistory: "Add family history item",
+  nonSmoker: "Non-smoker",
+  exSmoker: "Ex-smoker",
+  smoker: "Smoker",
+  none: "None",
+  occasional: "Occasional",
+  regular: "Regular",
+  heavy: "Heavy",
+  // ROS
+  step1of3: "Step 1 of 3",
+  reviewOfSystems: "Review of Systems",
+  rosInstruction: "Select all symptoms the patient is currently experiencing:",
+  noSymptomsSelected: "No symptoms selected",
+  selectAtLeastOne: "Please select at least one symptom before continuing.",
+  symptomsSaved: "Symptoms saved",
+  next: "Next",
+  // Complaints
+  step2of3: "Step 2 of 3",
+  chiefComplaints: "Chief Complaints",
+  complaintsInstruction: "Select up to 3 primary complaints from the reported symptoms:",
+  selectSymptom: "Select a symptom",
+  durationLabel: "Duration",
+  durationPlaceholder: "e.g. 3 days, 2 weeks",
+  addComplaint: "Add Complaint",
+  maxComplaints: "Maximum reached",
+  maxComplaintsMsg: "You can select up to 3 chief complaints.",
+  alreadyAdded: "Already added",
+  alreadyAddedMsg: "This symptom has already been added.",
+  noComplaints: "No complaints",
+  selectAtLeastOneComplaint: "Please select at least one chief complaint.",
+  removeComplaint: "Remove",
+  chiefComplaintsTitle: "Chief Complaints",
+  // Interview
+  step3of3: "Step 3 of 3",
+  aiInterview: "AI Interview",
+  interviewSubtitle: "Hakim will now conduct a structured clinical interview",
+  typeMessage: "Type your message...",
+  send: "Send",
+  interviewComplete: "Interview Complete",
+  interviewCompleteMsg: "The interview is complete. You can now generate the medical report.",
+  generateReportBtn: "Generate Report",
+  // Report
+  medicalReport: "Medical Report",
+  reportReady2: "Medical History",
+  disclaimer: "For documentation purposes only. Not a diagnostic tool.",
+  summaryForPhysician: "SUMMARY FOR PHYSICIAN",
+  chiefComplaint: "Chief Complaint",
+  historyOfPresentIllness: "History of Present Illness",
+  rosLabel: "Review of Systems",
+  pastMedicalHistory: "Past Medical History",
+  drugHistory: "Drug History",
+  allergyHistory: "Allergy History",
+  familyHistoryLabel: "Family History",
+  socialHistory: "Social History",
+  regenerateReport: "Regenerate Report",
+  noReport: "No Report Yet",
+  noReportSubtitle: "Complete the interview to generate the medical report",
+  generateNow: "Generate Now",
+  downloadPDF: "Download PDF",
+  downloadingPDF: "Preparing PDF...",
+  pdfReady: "Report exported",
+  pdfError: "Failed to export PDF",
+  // Send Case
+  sendCase: "Send Case",
+  sendToVolunteers: "Send to Volunteers (Free)",
+  sendToPaid: "Send for Paid Diagnosis",
+  sendCaseTitle: "Send Case for Consultation",
+  sendCaseSubtitle: "Choose how you'd like to get a consultation for this case:",
+  freeVolunteer: "Free — Medical Students",
+  freeDoctor: "Free — Volunteer Doctors",
+  paidDoctor: "Paid — Doctor Consultation",
+  sending: "Sending...",
+  caseSentSuccess: "Case sent successfully!",
+  caseSentError: "Failed to send case. Please try again.",
+  alreadySent: "A consultation request already exists for this case.",
+  reportRequired: "A completed report is required before sending.",
+  cancel: "Cancel",
+  sendFreeStudent: "Free — Medical Students",
+  sendFreeStudentDesc: "Reviewed by volunteer medical students",
+  sendFreeDoctor: "Free — Volunteer Doctors",
+  sendFreeDoctorDesc: "Reviewed by volunteer licensed doctors",
+  sendPaid: "Paid — Expert Doctor",
+  sendPaidDesc: "Priority review by a specialist doctor",
+  caseSentTitle: "Case Sent!",
+  caseSentDesc: "Your case has been submitted for consultation. You will be notified when a response is available.",
+  sendNow: "Send Case",
+  sendCaseDesc: "Choose the type of consultation you would like for this case:",
+  done: "Done",
+  // Patient
+  patientFile: "Patient File",
+  // Report
+  reportDisclaimer: "This report is generated by Hakim AI for documentation purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment.",
+  // Admin
+  adminPanelTitle: "Admin Panel",
+  doctorsList: "Doctors",
+  studentsList: "Students",
+  universitiesList: "Universities",
+  verified: "Verified",
+  pending: "Pending",
+  verify: "Verify",
+  // Register
+  registerTitle: "Create Account",
+  registerDoctor: "Register as Doctor",
+  registerStudent: "Register as Student",
+  alreadyHaveAccount: "Already have an account?",
+  signIn: "Sign In",
+};
+
+const AR: Record<string, string> = {
+  // App
+  appName: "حكيم",
+  appSub: "المساعد الطبي الذكي",
+  // Login
+  loginAs: "تسجيل الدخول كـ",
+  email: "البريد الإلكتروني",
+  password: "كلمة المرور",
+  login: "دخول",
+  loginLoading: "جارٍ الدخول...",
+  noAccount: "ليس لديك حساب؟",
+  register: "إنشاء حساب",
+  fieldRequired: "يرجى إدخال جميع البيانات",
+  loginFailed: "فشل تسجيل الدخول",
+  patient: "مريض",
+  doctor: "طبيب",
+  student: "طالب طب",
+  admin: "مدير",
+  emailHint: "البريد الإلكتروني",
+  registeredEmail: "البريد الإلكتروني المسجّل",
+  username: "اسم المستخدم",
+  showPassword: "إظهار كلمة المرور",
+  hidePassword: "إخفاء كلمة المرور",
+  // Home
+  patients: "المرضى",
+  medicalAssistant: "مساعد التاريخ المرضي",
+  addPatient: "إضافة مريض",
+  noPatients: "لا يوجد مرضى بعد",
+  noPatientsSubtitle: "أضف مريضك الأول للبدء",
+  loadingPatients: "جارٍ تحميل المرضى...",
+  errorLoadingPatients: "فشل تحميل المرضى",
+  retry: "إعادة المحاولة",
+  logout: "تسجيل الخروج",
+  adminPanel: "لوحة الإدارة",
+  // New Patient
+  newPatient: "مريض جديد",
+  save: "حفظ",
+  saving: "جارٍ الحفظ...",
+  fullName: "الاسم الكامل",
+  fullNamePlaceholder: "اسم المريض كاملاً",
+  age: "العمر",
+  agePlaceholder: "مثال: 35",
+  gender: "الجنس",
+  male: "ذكر",
+  female: "أنثى",
+  other: "آخر",
+  occupation: "المهنة",
+  occupationPlaceholder: "مثال: معلم",
+  weight: "الوزن (كجم)",
+  weightPlaceholder: "مثال: 75",
+  height: "الطول (سم)",
+  heightPlaceholder: "مثال: 170",
+  maritalStatus: "الحالة الاجتماعية",
+  single: "أعزب",
+  married: "متزوج",
+  divorced: "مطلق",
+  widowed: "أرمل",
+  nameRequired: "اسم المريض مطلوب",
+  patientSaved: "تم حفظ المريض بنجاح",
+  // Patient Detail
+  patientDetails: "تفاصيل المريض",
+  editProfile: "تعديل الملف الطبي",
+  newCase: "حالة جديدة",
+  medicalHistory: "التاريخ المرضي",
+  cases: "الحالات",
+  noCases: "لا توجد حالات بعد",
+  noCasesSubtitle: "ابدأ حالة جديدة لبدء المقابلة الطبية",
+  // Case Status
+  active: "نشطة",
+  interviewing: "قيد المقابلة",
+  interviewDone: "المقابلة منتهية",
+  reportReady: "التقرير جاهز",
+  startROS: "بدء مراجعة الأعراض",
+  continueInterview: "متابعة المقابلة",
+  generateReport: "إنشاء التقرير",
+  viewReport: "عرض التقرير",
+  openCase: "فتح الحالة",
+  // Profile
+  medicalBackground: "الخلفية الطبية",
+  chronicConditions: "الأمراض المزمنة",
+  currentMedications: "الأدوية الحالية",
+  allergies: "الحساسية",
+  surgicalHistory: "التاريخ الجراحي",
+  familyHistory: "التاريخ العائلي",
+  smokingStatus: "حالة التدخين",
+  alcoholUse: "استخدام الكحول",
+  addCondition: "إضافة مرض",
+  addMedication: "إضافة دواء",
+  addAllergy: "إضافة حساسية",
+  addSurgery: "إضافة عملية",
+  addFamilyHistory: "إضافة تاريخ عائلي",
+  nonSmoker: "غير مدخن",
+  exSmoker: "مدخن سابق",
+  smoker: "مدخن",
+  none: "لا شيء",
+  occasional: "أحياناً",
+  regular: "بانتظام",
+  heavy: "بشكل مفرط",
+  // ROS
+  step1of3: "الخطوة 1 من 3",
+  reviewOfSystems: "مراجعة الأجهزة",
+  rosInstruction: "اختر جميع الأعراض التي يعاني منها المريض حالياً:",
+  noSymptomsSelected: "لم يتم اختيار أعراض",
+  selectAtLeastOne: "يرجى اختيار عرض واحد على الأقل للمتابعة.",
+  symptomsSaved: "تم حفظ الأعراض",
+  next: "التالي",
+  // Complaints
+  step2of3: "الخطوة 2 من 3",
+  chiefComplaints: "الشكاوى الرئيسية",
+  complaintsInstruction: "اختر ما يصل إلى 3 شكاوى رئيسية من الأعراض المُبلَّغ عنها:",
+  selectSymptom: "اختر عرضاً",
+  durationLabel: "المدة",
+  durationPlaceholder: "مثال: 3 أيام، أسبوعان",
+  addComplaint: "إضافة شكوى",
+  maxComplaints: "الحد الأقصى",
+  maxComplaintsMsg: "يمكنك اختيار 3 شكاوى رئيسية كحد أقصى.",
+  alreadyAdded: "تمت الإضافة مسبقاً",
+  alreadyAddedMsg: "هذا العرض تمت إضافته مسبقاً.",
+  noComplaints: "لا توجد شكاوى",
+  selectAtLeastOneComplaint: "يرجى اختيار شكوى رئيسية واحدة على الأقل.",
+  removeComplaint: "حذف",
+  chiefComplaintsTitle: "الشكاوى الرئيسية",
+  // Interview
+  step3of3: "الخطوة 3 من 3",
+  aiInterview: "مقابلة ذكية",
+  interviewSubtitle: "سيجري حكيم الآن مقابلة سريرية منظمة",
+  typeMessage: "اكتب رسالتك...",
+  send: "إرسال",
+  interviewComplete: "اكتملت المقابلة",
+  interviewCompleteMsg: "اكتملت المقابلة. يمكنك الآن إنشاء التقرير الطبي.",
+  generateReportBtn: "إنشاء التقرير",
+  // Report
+  medicalReport: "التقرير الطبي",
+  reportReady2: "التاريخ المرضي",
+  disclaimer: "للتوثيق فقط. ليس أداة تشخيص.",
+  summaryForPhysician: "ملخص للطبيب",
+  chiefComplaint: "الشكوى الرئيسية",
+  historyOfPresentIllness: "تاريخ المرض الحالي",
+  rosLabel: "مراجعة الأجهزة",
+  pastMedicalHistory: "التاريخ المرضي السابق",
+  drugHistory: "تاريخ الأدوية",
+  allergyHistory: "تاريخ الحساسية",
+  familyHistoryLabel: "التاريخ العائلي",
+  socialHistory: "التاريخ الاجتماعي",
+  regenerateReport: "إعادة إنشاء التقرير",
+  noReport: "لا يوجد تقرير بعد",
+  noReportSubtitle: "أكمل المقابلة لإنشاء التقرير الطبي",
+  generateNow: "إنشاء الآن",
+  downloadPDF: "تحميل PDF",
+  downloadingPDF: "جارٍ تجهيز PDF...",
+  pdfReady: "تم تصدير التقرير",
+  pdfError: "فشل تصدير التقرير",
+  // Send Case
+  sendCase: "إرسال الحالة",
+  sendToVolunteers: "إرسال للمتطوعين (مجاناً)",
+  sendToPaid: "إرسال للتشخيص المدفوع",
+  sendCaseTitle: "إرسال الحالة للاستشارة",
+  sendCaseSubtitle: "اختر طريقة الحصول على استشارة لهذه الحالة:",
+  freeVolunteer: "مجاناً — طلاب طب متطوعون",
+  freeDoctor: "مجاناً — أطباء متطوعون",
+  paidDoctor: "مدفوع — استشارة طبيب",
+  sending: "جارٍ الإرسال...",
+  caseSentSuccess: "تم إرسال الحالة بنجاح!",
+  caseSentError: "فشل إرسال الحالة. يرجى المحاولة مرة أخرى.",
+  alreadySent: "يوجد طلب استشارة مُعلَّق لهذه الحالة بالفعل.",
+  reportRequired: "يجب إنشاء التقرير أولاً قبل الإرسال.",
+  cancel: "إلغاء",
+  sendFreeStudent: "مجاناً — طلاب الطب",
+  sendFreeStudentDesc: "مراجعة بواسطة طلاب طب متطوعين",
+  sendFreeDoctor: "مجاناً — أطباء متطوعون",
+  sendFreeDoctorDesc: "مراجعة بواسطة أطباء مرخصين متطوعين",
+  sendPaid: "مدفوع — طبيب متخصص",
+  sendPaidDesc: "مراجعة ذات أولوية من طبيب متخصص",
+  caseSentTitle: "تم إرسال الحالة!",
+  caseSentDesc: "تم تقديم الحالة للاستشارة. سيتم إشعارك عند توفر الرد.",
+  sendNow: "إرسال الحالة",
+  sendCaseDesc: "اختر نوع الاستشارة التي تريدها لهذه الحالة:",
+  done: "تم",
+  // Patient
+  patientFile: "ملف المريض",
+  // Report
+  reportDisclaimer: "هذا التقرير مُنشأ بواسطة حكيم الذكاء الاصطناعي لأغراض التوثيق فقط. ولا يُغني عن الاستشارة الطبية المتخصصة أو التشخيص أو العلاج.",
+  // Admin
+  adminPanelTitle: "لوحة الإدارة",
+  doctorsList: "الأطباء",
+  studentsList: "الطلاب",
+  universitiesList: "الجامعات",
+  verified: "موثَّق",
+  pending: "معلَّق",
+  verify: "توثيق",
+  // Register
+  registerTitle: "إنشاء حساب",
+  registerDoctor: "تسجيل كطبيب",
+  registerStudent: "تسجيل كطالب طب",
+  alreadyHaveAccount: "لديك حساب بالفعل؟",
+  signIn: "تسجيل الدخول",
+};
