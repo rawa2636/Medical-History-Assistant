@@ -1,6 +1,6 @@
 import { Router, type IRouter, type RequestHandler } from "express";
 import { db } from "@workspace/db";
-import { doctorsTable, medicalStudentsTable, adminsTable } from "@workspace/db/schema";
+import { doctorsTable, medicalStudentsTable, adminsTable, patientsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -129,6 +129,28 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    if (role === "patient") {
+      const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.email, email));
+      if (!patient) return res.status(401).json({ error: "Invalid credentials" });
+      if (!patient.passwordHash) return res.status(401).json({ error: "Account has no password set. Please register first." });
+
+      const valid = await bcrypt.compare(password, patient.passwordHash);
+      if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+      const token = signToken({ id: patient.id, email: patient.email!, role: "patient" });
+      return res.json({
+        token,
+        user: {
+          id: patient.id,
+          fullName: patient.name,
+          email: patient.email,
+          role: "patient",
+          age: patient.age,
+          gender: patient.gender,
+        },
+      });
+    }
+
     return res.status(400).json({ error: "Invalid role" });
   } catch (err) {
     req.log.error({ err }, "Login failed");
@@ -140,6 +162,15 @@ router.post("/login", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user as AuthPayload;
+
+    if (user.role === "patient") {
+      const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, user.id));
+      if (!patient) return res.status(404).json({ error: "Not found" });
+      return res.json({
+        id: patient.id, fullName: patient.name, email: patient.email, role: "patient",
+        age: patient.age, gender: patient.gender,
+      });
+    }
 
     if (user.role === "admin") {
       const [admin] = await db.select().from(adminsTable).where(eq(adminsTable.id, user.id));

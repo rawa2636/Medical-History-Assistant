@@ -30,9 +30,10 @@ const C = {
 };
 
 const ROLES: { id: UserRole; label: string; icon: string; color: string; hint: string }[] = [
+  { id: "patient", label: "مريض", icon: "heart", color: "#E53E3E", hint: "البريد الإلكتروني" },
   { id: "doctor", label: "طبيب", icon: "user-check", color: C.primary, hint: "البريد الإلكتروني المسجّل" },
   { id: "student", label: "طالب طب", icon: "book-open", color: C.purple, hint: "البريد الإلكتروني المسجّل" },
-  { id: "admin", label: "مدير النظام", icon: "settings", color: C.blue, hint: "اسم المستخدم" },
+  { id: "admin", label: "مدير", icon: "settings", color: C.blue, hint: "اسم المستخدم" },
 ];
 
 export default function LoginScreen() {
@@ -60,7 +61,11 @@ export default function LoginScreen() {
 
     if (result.success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/");
+      if (role === "patient") {
+        router.replace("/patient-portal" as any);
+      } else {
+        router.replace("/");
+      }
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(result.error || "فشل تسجيل الدخول");

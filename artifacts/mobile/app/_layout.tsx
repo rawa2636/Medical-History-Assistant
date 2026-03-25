@@ -64,6 +64,8 @@ function RootLayoutNav() {
       <Stack.Screen name="admin/doctors" />
       <Stack.Screen name="admin/students" />
       <Stack.Screen name="admin/universities" />
+      <Stack.Screen name="patient-portal/index" />
+      <Stack.Screen name="patient-portal/consult" />
     </Stack>
   );
 }

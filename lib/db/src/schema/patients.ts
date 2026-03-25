@@ -11,8 +11,10 @@ export const patientsTable = pgTable("patients", {
   weight: text("weight"),
   height: text("height"),
   maritalStatus: text("marital_status"),
-  email: text("email"),
+  email: text("email").unique(),
   phone: text("phone"),
+  passwordHash: text("password_hash"),
+  accountStatus: text("account_status").notNull().default("guest"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

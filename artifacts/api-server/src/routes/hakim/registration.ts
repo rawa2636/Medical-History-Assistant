@@ -224,6 +224,49 @@ router.post("/students/:id/verify", async (req, res) => {
   }
 });
 
+// ─── Patient Registration ──────────────────────────────────────────────────
+
+router.post("/patients/register", async (req, res) => {
+  try {
+    const { name, email, password, age, gender, phone } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Name, email, and password are required" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    const { patientsTable } = await import("@workspace/db/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [existing] = await db.select().from(patientsTable).where(eq(patientsTable.email, email));
+    if (existing) {
+      if (existing.passwordHash) {
+        return res.status(409).json({ error: "Email already registered" });
+      }
+      // Update existing patient record with password
+      const passwordHash = await bcrypt.hash(password, 10);
+      const [updated] = await db.update(patientsTable)
+        .set({ passwordHash, accountStatus: "active", updatedAt: new Date() })
+        .where(eq(patientsTable.id, existing.id))
+        .returning();
+      const { passwordHash: _ph, ...safe } = updated;
+      return res.json({ ...safe, isExistingPatient: true });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const [patient] = await db.insert(patientsTable)
+      .values({ name, email, passwordHash, accountStatus: "active", age: age || null, gender: gender || null, phone: phone || null })
+      .returning();
+
+    const { passwordHash: _ph, ...safe } = patient;
+    res.status(201).json(safe);
+  } catch (err) {
+    req.log.error({ err }, "Patient registration failed");
+    res.status(400).json({ error: "Registration failed" });
+  }
+});
+
 // ─── Admin Stats ───────────────────────────────────────────────────────────
 
 router.get("/admin/stats", async (req, res) => {

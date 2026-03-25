@@ -7,11 +7,13 @@ import reportsRouter from "./hakim/reports";
 import doctorRouter from "./hakim/doctor";
 import registrationRouter from "./hakim/registration";
 import authRouter from "./hakim/auth";
+import consultationsRouter from "./hakim/consultations";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+router.use("/consultations", consultationsRouter);
 router.use("/patients", patientsRouter);
 router.use("/cases", casesRouter);
 router.use("/cases", interviewRouter);
