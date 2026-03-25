@@ -2,6 +2,13 @@ import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const adminsTable = pgTable("admins", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const universitiesTable = pgTable("universities", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -24,6 +31,7 @@ export const doctorsTable = pgTable("doctors", {
   id: serial("id").primaryKey(),
   fullName: text("full_name").notNull(),
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
   phone: text("phone"),
   specialization: text("specialization").notNull(),
   licenseNumber: text("license_number").notNull(),
@@ -50,6 +58,7 @@ export const medicalStudentsTable = pgTable("medical_students", {
   id: serial("id").primaryKey(),
   fullName: text("full_name").notNull(),
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
   phone: text("phone"),
   universityId: integer("university_id").references(() => universitiesTable.id),
   universityCardNumber: text("university_card_number").notNull(),
@@ -68,6 +77,7 @@ export const insertUniversityStudentSchema = createInsertSchema(universityStuden
 export const insertDoctorSchema = createInsertSchema(doctorsTable).omit({ id: true, createdAt: true, updatedAt: true, verificationStatus: true, verifiedAt: true });
 export const insertMedicalStudentSchema = createInsertSchema(medicalStudentsTable).omit({ id: true, createdAt: true, updatedAt: true, verificationStatus: true, verifiedAt: true });
 
+export type Admin = typeof adminsTable.$inferSelect;
 export type University = typeof universitiesTable.$inferSelect;
 export type UniversityStudent = typeof universityStudentsTable.$inferSelect;
 export type Doctor = typeof doctorsTable.$inferSelect;

@@ -1,5 +1,22 @@
 export const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 
+export const authEndpoints = {
+  login: `${API_BASE}/auth/login`,
+  logout: `${API_BASE}/auth/logout`,
+  me: `${API_BASE}/auth/me`,
+};
+
+export const registrationEndpoints = {
+  registerDoctor: `${API_BASE}/registration/doctors/register`,
+  registerStudent: `${API_BASE}/registration/students/register`,
+  universities: `${API_BASE}/registration/universities`,
+  doctors: `${API_BASE}/registration/doctors`,
+  students: `${API_BASE}/registration/students`,
+  verifyDoctor: (id: number) => `${API_BASE}/registration/doctors/${id}/verify`,
+  verifyStudent: (id: number) => `${API_BASE}/registration/students/${id}/verify`,
+  adminStats: `${API_BASE}/registration/admin/stats`,
+};
+
 export const endpoints = {
   patients: `${API_BASE}/patients`,
   patient: (id: number) => `${API_BASE}/patients/${id}`,

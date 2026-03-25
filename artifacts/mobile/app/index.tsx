@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { endpoints } from "@/constants/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Patient {
   id: number;
@@ -69,6 +70,7 @@ function PatientCard({ patient }: { patient: Patient }) {
 export default function HomeScreen() {
   const C = Colors.light;
   const insets = useSafeAreaInsets();
+  const { user, logout } = useAuth();
   const { data: patients, isLoading, error, refetch } = useQuery({
     queryKey: ["patients"],
     queryFn: fetchPatients,
@@ -94,19 +96,23 @@ export default function HomeScreen() {
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
         <View>
           <Text style={[styles.headerTitle, { color: C.text }]}>Hakim</Text>
-          <Text style={[styles.headerSubtitle, { color: C.textSecondary }]}>Medical History Assistant</Text>
+          <Text style={[styles.headerSubtitle, { color: C.textSecondary }]}>
+            {user ? user.fullName : "Medical History Assistant"}
+          </Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={[styles.iconBtn, { borderColor: C.border }]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              router.push("/admin" as any);
-            }}
-            activeOpacity={0.7}
-          >
-            <Feather name="settings" size={18} color={C.textSecondary} />
-          </TouchableOpacity>
+          {user?.role === "admin" && (
+            <TouchableOpacity
+              style={[styles.iconBtn, { borderColor: C.border }]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                router.push("/admin" as any);
+              }}
+              activeOpacity={0.7}
+            >
+              <Feather name="settings" size={18} color={C.textSecondary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.iconBtn, { borderColor: C.border }]}
             onPress={() => {
@@ -116,6 +122,17 @@ export default function HomeScreen() {
             activeOpacity={0.7}
           >
             <Feather name="user-plus" size={18} color={C.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, { borderColor: "#FFE0E0" }]}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await logout();
+              router.replace("/login");
+            }}
+            activeOpacity={0.7}
+          >
+            <Feather name="log-out" size={18} color="#EF4444" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: C.primary }]}

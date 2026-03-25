@@ -9,6 +9,7 @@ import {
   insertMedicalStudentSchema,
 } from "@workspace/db/schema";
 import { eq, ilike, or } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
 
@@ -16,12 +17,18 @@ const router: IRouter = Router();
 
 router.post("/doctors/register", async (req, res) => {
   try {
-    const data = insertDoctorSchema.parse(req.body);
+    const { password, ...rest } = req.body;
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+    const data = insertDoctorSchema.parse(rest);
     const [existing] = await db.select().from(doctorsTable).where(eq(doctorsTable.email, data.email));
     if (existing) return res.status(409).json({ error: "Email already registered" });
 
-    const [doctor] = await db.insert(doctorsTable).values(data).returning();
-    res.status(201).json(doctor);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const [doctor] = await db.insert(doctorsTable).values({ ...data, passwordHash }).returning();
+    const { passwordHash: _ph, ...safeDoctor } = doctor;
+    res.status(201).json(safeDoctor);
   } catch (err) {
     req.log.error({ err }, "Doctor registration failed");
     res.status(400).json({ error: "Invalid registration data" });
@@ -141,7 +148,11 @@ router.post("/universities/:id/students", async (req, res) => {
 
 router.post("/students/register", async (req, res) => {
   try {
-    const data = insertMedicalStudentSchema.parse(req.body);
+    const { password, ...rest } = req.body;
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+    const data = insertMedicalStudentSchema.parse(rest);
 
     const [existing] = await db.select().from(medicalStudentsTable).where(eq(medicalStudentsTable.email, data.email));
     if (existing) return res.status(409).json({ error: "Email already registered" });
@@ -151,12 +162,6 @@ router.post("/students/register", async (req, res) => {
     let verifiedAt: Date | null = null;
 
     if (data.universityId && data.universityCardNumber) {
-      const [match] = await db.select()
-        .from(universityStudentsTable)
-        .where(
-          eq(universityStudentsTable.universityId, data.universityId)
-        );
-
       const studentMatch = await db.select()
         .from(universityStudentsTable)
         .where(eq(universityStudentsTable.universityCardNumber, data.universityCardNumber));
@@ -167,12 +172,14 @@ router.post("/students/register", async (req, res) => {
       }
     }
 
+    const passwordHash = await bcrypt.hash(password, 10);
     const [student] = await db.insert(medicalStudentsTable)
-      .values({ ...data, verificationStatus, verifiedAt })
+      .values({ ...data, passwordHash, verificationStatus, verifiedAt })
       .returning();
 
+    const { passwordHash: _ph, ...safeStudent } = student;
     res.status(201).json({
-      ...student,
+      ...safeStudent,
       autoVerified: verificationStatus === "approved",
     });
   } catch (err) {

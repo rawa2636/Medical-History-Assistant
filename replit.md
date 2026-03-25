@@ -1,8 +1,8 @@
-# Workspace
+# Workspace — Hakim Medical Assistant
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo using TypeScript. Full-stack medical history assistant platform with AI-driven clinical interviews (SOCRATES framework), doctor/student registration, admin verification panel, and JWT authentication.
 
 ## Stack
 
