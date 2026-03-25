@@ -38,8 +38,10 @@ router.get("/:id", async (req, res) => {
     const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, id));
     if (!patient) return res.status(404).json({ error: "Patient not found" });
 
-    const [profile] = await db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, id));
-    const cases = await db.select().from(casesTable).where(eq(casesTable.patientId, id)).orderBy(casesTable.createdAt);
+    const [[profile], cases] = await Promise.all([
+      db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, id)),
+      db.select().from(casesTable).where(eq(casesTable.patientId, id)).orderBy(casesTable.createdAt),
+    ]);
 
     res.json({ patient, profile: profile || null, cases });
   } catch (err) {

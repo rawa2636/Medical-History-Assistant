@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,105 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
+type SymptomChipProps = {
+  symptom: string;
+  displayName: string;
+  isSelected: boolean;
+  color: string;
+  onToggle: (symptom: string) => void;
+};
+
+const SymptomChip = memo(function SymptomChip({ symptom, displayName, isSelected, color, onToggle }: SymptomChipProps) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.symptomBtn,
+        {
+          backgroundColor: isSelected ? color + "15" : C.background,
+          borderColor: isSelected ? color : C.border,
+        },
+      ]}
+      onPress={() => onToggle(symptom)}
+      activeOpacity={0.7}
+    >
+      {isSelected && <Feather name="check" size={12} color={color} />}
+      <Text style={[styles.symptomText, { color: isSelected ? color : C.textSecondary }]}>
+        {displayName}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
+type SystemCardProps = {
+  system: typeof SYMPTOM_SYSTEMS[0];
+  selectedSymptoms: string[];
+  isExpanded: boolean;
+  language: string;
+  isRTL: boolean;
+  textAlign: "left" | "right";
+  onToggleExpand: (id: string) => void;
+  onToggleSymptom: (systemId: string, symptomEn: string) => void;
+};
+
+const SystemCard = memo(function SystemCard({
+  system,
+  selectedSymptoms,
+  isExpanded,
+  language,
+  isRTL,
+  textAlign,
+  onToggleExpand,
+  onToggleSymptom,
+}: SystemCardProps) {
+  const systemName = language === "ar" ? system.nameAr : system.name;
+  const symptoms = language === "ar" ? system.symptomsAr : system.symptoms;
+
+  const handleToggleSymptom = useCallback((symptomEn: string) => {
+    onToggleSymptom(system.id, symptomEn);
+  }, [system.id, onToggleSymptom]);
+
+  return (
+    <View style={[styles.systemCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+      <TouchableOpacity
+        style={[styles.systemHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+        onPress={() => { Haptics.selectionAsync(); onToggleExpand(system.id); }}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.systemIcon, { backgroundColor: system.color + "20" }]}>
+          <Feather name={system.icon as any} size={18} color={system.color} />
+        </View>
+        <Text style={[styles.systemName, { color: C.text, textAlign }]}>{systemName}</Text>
+        <View style={[styles.systemRight, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          {selectedSymptoms.length > 0 && (
+            <View style={[styles.countBadge, { backgroundColor: system.color }]}>
+              <Text style={styles.countBadgeText}>{selectedSymptoms.length}</Text>
+            </View>
+          )}
+          <Feather name={isExpanded ? "chevron-up" : "chevron-down"} size={18} color={C.textTertiary} />
+        </View>
+      </TouchableOpacity>
+
+      {isExpanded && (
+        <View style={[styles.symptomsGrid, { borderTopColor: C.border }]}>
+          {symptoms.map((symptom, idx) => {
+            const englishSymptom = system.symptoms[idx];
+            return (
+              <SymptomChip
+                key={englishSymptom}
+                symptom={englishSymptom}
+                displayName={symptom}
+                isSelected={selectedSymptoms.includes(englishSymptom)}
+                color={system.color}
+                onToggle={handleToggleSymptom}
+              />
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+});
+
 export default function ReviewOfSystemsScreen() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
   const insets = useSafeAreaInsets();
@@ -34,7 +133,7 @@ export default function ReviewOfSystemsScreen() {
   const totalSelected = Object.values(selectedSymptoms).flat().length;
   const textAlign = isRTL ? "right" : "left";
 
-  function toggleSymptom(systemId: string, symptomEn: string) {
+  const toggleSymptom = useCallback((systemId: string, symptomEn: string) => {
     Haptics.selectionAsync();
     setSelectedSymptoms((prev) => {
       const current = prev[systemId] || [];
@@ -44,7 +143,11 @@ export default function ReviewOfSystemsScreen() {
         return { ...prev, [systemId]: [...current, symptomEn] };
       }
     });
-  }
+  }, []);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedSystem((prev) => (prev === id ? null : id));
+  }, []);
 
   async function handleNext() {
     if (totalSelected === 0) {
@@ -88,63 +191,19 @@ export default function ReviewOfSystemsScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]} showsVerticalScrollIndicator={false}>
         <Text style={[styles.instruction, { color: C.textSecondary, textAlign }]}>{t("rosInstruction")}</Text>
 
-        {SYMPTOM_SYSTEMS.map((system) => {
-          const selected = selectedSymptoms[system.id] || [];
-          const isExpanded = expandedSystem === system.id;
-          const systemName = language === "ar" ? system.nameAr : system.name;
-          const symptoms = language === "ar" ? system.symptomsAr : system.symptoms;
-
-          return (
-            <View key={system.id} style={[styles.systemCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
-              <TouchableOpacity
-                style={[styles.systemHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}
-                onPress={() => { Haptics.selectionAsync(); setExpandedSystem(isExpanded ? null : system.id); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.systemIcon, { backgroundColor: system.color + "20" }]}>
-                  <Feather name={system.icon as any} size={18} color={system.color} />
-                </View>
-                <Text style={[styles.systemName, { color: C.text, textAlign }]}>{systemName}</Text>
-                <View style={[styles.systemRight, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                  {selected.length > 0 && (
-                    <View style={[styles.countBadge, { backgroundColor: system.color }]}>
-                      <Text style={styles.countBadgeText}>{selected.length}</Text>
-                    </View>
-                  )}
-                  <Feather name={isExpanded ? "chevron-up" : "chevron-down"} size={18} color={C.textTertiary} />
-                </View>
-              </TouchableOpacity>
-
-              {isExpanded && (
-                <View style={[styles.symptomsGrid, { borderTopColor: C.border }]}>
-                  {symptoms.map((symptom, idx) => {
-                    const englishSymptom = system.symptoms[idx];
-                    const isSelected = selected.includes(englishSymptom);
-                    return (
-                      <TouchableOpacity
-                        key={englishSymptom}
-                        style={[
-                          styles.symptomBtn,
-                          {
-                            backgroundColor: isSelected ? system.color + "15" : C.background,
-                            borderColor: isSelected ? system.color : C.border,
-                          },
-                        ]}
-                        onPress={() => toggleSymptom(system.id, englishSymptom)}
-                        activeOpacity={0.7}
-                      >
-                        {isSelected && <Feather name="check" size={12} color={system.color} />}
-                        <Text style={[styles.symptomText, { color: isSelected ? system.color : C.textSecondary }]}>
-                          {symptom}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          );
-        })}
+        {SYMPTOM_SYSTEMS.map((system) => (
+          <SystemCard
+            key={system.id}
+            system={system}
+            selectedSymptoms={selectedSymptoms[system.id] || []}
+            isExpanded={expandedSystem === system.id}
+            language={language}
+            isRTL={isRTL}
+            textAlign={textAlign}
+            onToggleExpand={toggleExpand}
+            onToggleSymptom={toggleSymptom}
+          />
+        ))}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border }]}>

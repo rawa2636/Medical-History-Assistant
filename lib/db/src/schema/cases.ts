@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { patientsTable } from "./patients";
@@ -11,7 +11,10 @@ export const casesTable = pgTable("cases", {
   chiefComplaints: jsonb("chief_complaints").default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("cases_patient_id_idx").on(t.patientId),
+  index("cases_status_idx").on(t.status),
+]);
 
 export const interviewSessionsTable = pgTable("interview_sessions", {
   id: serial("id").primaryKey(),
@@ -20,7 +23,9 @@ export const interviewSessionsTable = pgTable("interview_sessions", {
   isComplete: text("is_complete").notNull().default("false"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("interview_sessions_case_id_idx").on(t.caseId),
+]);
 
 export const medicalHistoriesTable = pgTable("medical_histories", {
   id: serial("id").primaryKey(),
@@ -36,7 +41,9 @@ export const medicalHistoriesTable = pgTable("medical_histories", {
   socialHistory: jsonb("social_history").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("medical_histories_case_id_idx").on(t.caseId),
+]);
 
 export const reportsTable = pgTable("reports", {
   id: serial("id").primaryKey(),
@@ -52,7 +59,9 @@ export const reportsTable = pgTable("reports", {
   socialHistory: text("social_history"),
   summary: text("summary"),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("reports_case_id_idx").on(t.caseId),
+]);
 
 export const doctorNotesTable = pgTable("doctor_notes", {
   id: serial("id").primaryKey(),
@@ -60,7 +69,9 @@ export const doctorNotesTable = pgTable("doctor_notes", {
   doctorName: text("doctor_name").notNull(),
   notes: text("notes").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("doctor_notes_case_id_idx").on(t.caseId),
+]);
 
 export const insertCaseSchema = createInsertSchema(casesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInterviewSessionSchema = createInsertSchema(interviewSessionsTable).omit({ id: true, createdAt: true, updatedAt: true });

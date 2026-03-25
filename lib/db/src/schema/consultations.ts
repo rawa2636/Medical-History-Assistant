@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, numeric, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { patientsTable } from "./patients";
@@ -21,7 +21,13 @@ export const consultationRequestsTable = pgTable("consultation_requests", {
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("consultation_requests_patient_id_idx").on(t.patientId),
+  index("consultation_requests_case_id_idx").on(t.caseId),
+  index("consultation_requests_status_idx").on(t.status),
+  index("consultation_requests_assigned_doctor_id_idx").on(t.assignedDoctorId),
+  index("consultation_requests_assigned_student_id_idx").on(t.assignedStudentId),
+]);
 
 export const insertConsultationSchema = createInsertSchema(consultationRequestsTable).omit({
   id: true,

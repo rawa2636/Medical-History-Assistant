@@ -8,7 +8,7 @@ import {
   insertDoctorSchema,
   insertMedicalStudentSchema,
 } from "@workspace/db/schema";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, count, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
@@ -271,32 +271,56 @@ router.post("/patients/register", async (req, res) => {
 
 router.get("/admin/stats", async (req, res) => {
   try {
-    const allDoctors = await db.select().from(doctorsTable);
-    const allStudents = await db.select().from(medicalStudentsTable);
-    const allUniversities = await db.select().from(universitiesTable);
+    const [
+      [doctorsTotal],
+      [doctorsPending],
+      [doctorsApproved],
+      [doctorsRejected],
+      [doctorsVolunteers],
+      [studentsTotal],
+      [studentsPending],
+      [studentsApproved],
+      [studentsRejected],
+      [studentsAutoVerified],
+      [universitiesTotal],
+      [universitiesActive],
+    ] = await Promise.all([
+      db.select({ count: count() }).from(doctorsTable),
+      db.select({ count: count() }).from(doctorsTable).where(eq(doctorsTable.verificationStatus, "pending")),
+      db.select({ count: count() }).from(doctorsTable).where(eq(doctorsTable.verificationStatus, "approved")),
+      db.select({ count: count() }).from(doctorsTable).where(eq(doctorsTable.verificationStatus, "rejected")),
+      db.select({ count: count() }).from(doctorsTable).where(eq(doctorsTable.isVolunteer, true)),
+      db.select({ count: count() }).from(medicalStudentsTable),
+      db.select({ count: count() }).from(medicalStudentsTable).where(eq(medicalStudentsTable.verificationStatus, "pending")),
+      db.select({ count: count() }).from(medicalStudentsTable).where(eq(medicalStudentsTable.verificationStatus, "approved")),
+      db.select({ count: count() }).from(medicalStudentsTable).where(eq(medicalStudentsTable.verificationStatus, "rejected")),
+      db.select({ count: count() }).from(medicalStudentsTable).where(
+        and(eq(medicalStudentsTable.verificationStatus, "approved"), sql`${medicalStudentsTable.verifiedAt} IS NOT NULL`)
+      ),
+      db.select({ count: count() }).from(universitiesTable),
+      db.select({ count: count() }).from(universitiesTable).where(eq(universitiesTable.isActive, true)),
+    ]);
 
-    const stats = {
+    res.json({
       doctors: {
-        total: allDoctors.length,
-        pending: allDoctors.filter((d) => d.verificationStatus === "pending").length,
-        approved: allDoctors.filter((d) => d.verificationStatus === "approved").length,
-        rejected: allDoctors.filter((d) => d.verificationStatus === "rejected").length,
-        volunteers: allDoctors.filter((d) => d.isVolunteer).length,
+        total: Number(doctorsTotal.count),
+        pending: Number(doctorsPending.count),
+        approved: Number(doctorsApproved.count),
+        rejected: Number(doctorsRejected.count),
+        volunteers: Number(doctorsVolunteers.count),
       },
       students: {
-        total: allStudents.length,
-        pending: allStudents.filter((s) => s.verificationStatus === "pending").length,
-        approved: allStudents.filter((s) => s.verificationStatus === "approved").length,
-        rejected: allStudents.filter((s) => s.verificationStatus === "rejected").length,
-        autoVerified: allStudents.filter((s) => s.verifiedAt && s.verificationStatus === "approved").length,
+        total: Number(studentsTotal.count),
+        pending: Number(studentsPending.count),
+        approved: Number(studentsApproved.count),
+        rejected: Number(studentsRejected.count),
+        autoVerified: Number(studentsAutoVerified.count),
       },
       universities: {
-        total: allUniversities.length,
-        active: allUniversities.filter((u) => u.isActive).length,
+        total: Number(universitiesTotal.count),
+        active: Number(universitiesActive.count),
       },
-    };
-
-    res.json(stats);
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch stats" });
   }

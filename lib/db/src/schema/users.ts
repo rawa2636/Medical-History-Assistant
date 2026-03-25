@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -25,7 +25,10 @@ export const universityStudentsTable = pgTable("university_students", {
   universityCardNumber: text("university_card_number").notNull(),
   studyYear: integer("study_year"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("university_students_university_id_idx").on(t.universityId),
+  index("university_students_card_number_idx").on(t.universityCardNumber),
+]);
 
 export const doctorsTable = pgTable("doctors", {
   id: serial("id").primaryKey(),
@@ -52,7 +55,10 @@ export const doctorsTable = pgTable("doctors", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("doctors_verification_status_idx").on(t.verificationStatus),
+  index("doctors_is_volunteer_idx").on(t.isVolunteer),
+]);
 
 export const medicalStudentsTable = pgTable("medical_students", {
   id: serial("id").primaryKey(),
@@ -70,7 +76,10 @@ export const medicalStudentsTable = pgTable("medical_students", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("medical_students_verification_status_idx").on(t.verificationStatus),
+  index("medical_students_university_id_idx").on(t.universityId),
+]);
 
 export const insertUniversitySchema = createInsertSchema(universitiesTable).omit({ id: true, createdAt: true });
 export const insertUniversityStudentSchema = createInsertSchema(universityStudentsTable).omit({ id: true, createdAt: true });
