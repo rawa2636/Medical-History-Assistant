@@ -65,6 +65,8 @@ export default function LoginScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (role === "patient") {
         router.replace("/patient-portal" as any);
+      } else if (role === "admin") {
+        router.replace("/admin" as any);
       } else {
         router.replace("/");
       }

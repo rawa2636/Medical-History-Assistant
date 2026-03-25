@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE } from "@/constants/api";
 
 const TOKEN_KEY = "hakim_auth_token";
 const USER_KEY = "hakim_auth_user";
 
-export type UserRole = "doctor" | "student" | "admin";
+export type UserRole = "doctor" | "student" | "admin" | "patient";
 
 export interface AuthUser {
   id: number;
@@ -28,6 +29,29 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function saveItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === "web") {
+    try { localStorage.setItem(key, value); } catch {}
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+}
+
+async function getItem(key: string): Promise<string | null> {
+  if (Platform.OS === "web") {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  return SecureStore.getItemAsync(key);
+}
+
+async function deleteItem(key: string): Promise<void> {
+  if (Platform.OS === "web") {
+    try { localStorage.removeItem(key); } catch {}
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -40,12 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadStoredAuth = async () => {
     try {
       const [storedToken, storedUser] = await Promise.all([
-        SecureStore.getItemAsync(TOKEN_KEY),
-        SecureStore.getItemAsync(USER_KEY),
+        getItem(TOKEN_KEY),
+        getItem(USER_KEY),
       ]);
 
       if (storedToken && storedUser) {
-        // Validate token with server
         const res = await fetch(`${API_BASE}/auth/me`, {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
@@ -55,16 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(storedToken);
           setUser(userData);
         } else {
-          // Token expired or invalid — clear storage
-          await SecureStore.deleteItemAsync(TOKEN_KEY);
-          await SecureStore.deleteItemAsync(USER_KEY);
+          await deleteItem(TOKEN_KEY);
+          await deleteItem(USER_KEY);
         }
       }
     } catch {
-      // Network error — use cached user if available
       try {
-        const storedUser = await SecureStore.getItemAsync(USER_KEY);
-        const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+        const storedUser = await getItem(USER_KEY);
+        const storedToken = await getItem(TOKEN_KEY);
         if (storedToken && storedUser) {
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
@@ -89,8 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error || "Login failed" };
       }
 
-      await SecureStore.setItemAsync(TOKEN_KEY, data.token);
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data.user));
+      await saveItem(TOKEN_KEY, data.token);
+      await saveItem(USER_KEY, JSON.stringify(data.user));
       setToken(data.token);
       setUser(data.user);
       return { success: true };
@@ -108,8 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }).catch(() => {});
       }
     } finally {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
+      await deleteItem(TOKEN_KEY);
+      await deleteItem(USER_KEY);
       setToken(null);
       setUser(null);
     }

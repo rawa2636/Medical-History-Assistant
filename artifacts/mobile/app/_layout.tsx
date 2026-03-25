@@ -26,7 +26,7 @@ const queryClient = new QueryClient();
 const PUBLIC_SEGMENTS = ["login", "register"];
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const segments = useSegments();
 
   useEffect(() => {
@@ -38,9 +38,15 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated && !isPublic) {
       router.replace("/login");
     } else if (isAuthenticated && firstSegment === "login") {
-      router.replace("/");
+      if (user?.role === "admin") {
+        router.replace("/admin" as any);
+      } else if (user?.role === "patient") {
+        router.replace("/patient-portal" as any);
+      } else {
+        router.replace("/");
+      }
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, user]);
 
   return <>{children}</>;
 }
