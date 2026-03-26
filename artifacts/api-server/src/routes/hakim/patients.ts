@@ -4,6 +4,7 @@ import {
   patientsTable,
   patientProfilesTable,
   casesTable,
+  reportsTable,
   insertPatientSchema,
   insertPatientProfileSchema,
 } from "@workspace/db/schema";
@@ -39,7 +40,15 @@ router.get("/:id", async (req, res) => {
     if (!patient) return res.status(404).json({ error: "Patient not found" });
 
     const [profile] = await db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, id));
-    const cases = await db.select().from(casesTable).where(eq(casesTable.patientId, id)).orderBy(casesTable.createdAt);
+    const rawCases = await db.select().from(casesTable).where(eq(casesTable.patientId, id)).orderBy(casesTable.createdAt);
+
+    // Enrich each case with hasReport flag
+    const caseIds = rawCases.map((c) => c.id);
+    const reportsFound = caseIds.length > 0
+      ? await db.select({ caseId: reportsTable.caseId }).from(reportsTable)
+      : [];
+    const reportedCaseIds = new Set(reportsFound.map((r) => r.caseId));
+    const cases = rawCases.map((c) => ({ ...c, hasReport: reportedCaseIds.has(c.id) }));
 
     res.json({ patient, profile: profile || null, cases });
   } catch (err) {

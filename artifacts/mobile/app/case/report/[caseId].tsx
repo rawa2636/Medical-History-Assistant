@@ -19,6 +19,7 @@ import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { endpoints } from "@/constants/api";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const C = Colors.light;
 
@@ -34,7 +35,6 @@ interface CaseReport {
   familyHistory: string;
   socialHistory: string;
   medicationsAllergies: string;
-  physicalExamination: string;
   assessment: string;
   plan: string;
   createdAt: string;
@@ -53,12 +53,14 @@ function Section({ title, content }: { title: string; content: string }) {
 function SendCaseModal({
   visible,
   caseId,
+  token,
   onClose,
   t,
   isRTL,
 }: {
   visible: boolean;
   caseId: string;
+  token: string | null;
   onClose: () => void;
   t: (k: string) => string;
   isRTL: boolean;
@@ -75,19 +77,32 @@ function SendCaseModal({
 
   async function handleSend() {
     if (!selectedType) return;
+    if (!token) {
+      Alert.alert(
+        isRTL ? "يلزم تسجيل الدخول" : "Login Required",
+        isRTL ? "يجب تسجيل الدخول لإرسال الحالة." : "You must be logged in to send a case."
+      );
+      return;
+    }
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const res = await fetch(endpoints.consultations, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ caseId: parseInt(caseId), consultationType: selectedType }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
       setSent(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert("Error", "Failed to send case. Please try again.");
+    } catch (e: any) {
+      Alert.alert(isRTL ? "خطأ" : "Error", e.message || (isRTL ? "فشل الإرسال. حاول مرة أخرى." : "Failed to send case. Please try again."));
     } finally {
       setSending(false);
     }
@@ -122,7 +137,10 @@ function SendCaseModal({
                 {options.map((opt) => (
                   <TouchableOpacity
                     key={opt.id}
-                    style={[styles.consultOption, { borderColor: selectedType === opt.id ? opt.color : C.border, backgroundColor: selectedType === opt.id ? opt.color + "10" : C.backgroundSecondary }]}
+                    style={[styles.consultOption, {
+                      borderColor: selectedType === opt.id ? opt.color : C.border,
+                      backgroundColor: selectedType === opt.id ? opt.color + "10" : C.backgroundSecondary,
+                    }]}
                     onPress={() => { Haptics.selectionAsync(); setSelectedType(opt.id); }}
                     activeOpacity={0.8}
                   >
@@ -160,10 +178,31 @@ function SendCaseModal({
   );
 }
 
+function mapApiReportToScreen(raw: any): CaseReport {
+  const info = raw.patientInfo ?? {};
+  return {
+    id: raw.id,
+    patientName: info.name ?? "Unknown",
+    patientAge: info.age ?? null,
+    patientGender: info.gender ?? null,
+    chiefComplaints: raw.chiefComplaint ?? raw.chiefComplaints ?? "",
+    historyOfPresentIllness: raw.hpi ?? raw.historyOfPresentIllness ?? "",
+    reviewOfSystems: raw.ros ?? raw.reviewOfSystems ?? "",
+    pastMedicalHistory: raw.pmh ?? raw.pastMedicalHistory ?? "",
+    familyHistory: raw.familyHistory ?? "",
+    socialHistory: raw.socialHistory ?? "",
+    medicationsAllergies: [raw.drugHistory, raw.allergyHistory].filter(Boolean).join("\n") || raw.medicationsAllergies || "",
+    assessment: raw.assessment ?? raw.summary ?? "",
+    plan: raw.plan ?? "",
+    createdAt: raw.generatedAt ?? raw.createdAt ?? new Date().toISOString(),
+  };
+}
+
 export default function ReportScreen() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
   const insets = useSafeAreaInsets();
   const { t, isRTL } = useLanguage();
+  const { token } = useAuth();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -179,7 +218,10 @@ export default function ReportScreen() {
       const res = await fetch(endpoints.case(parseInt(caseId)));
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setReport(data.report || null);
+      const rawReport = data.report ?? data;
+      if (rawReport && rawReport.id) {
+        setReport(mapApiReportToScreen(rawReport));
+      }
     } catch {
       Alert.alert("Error", "Failed to load report.");
     } finally {
@@ -237,7 +279,7 @@ export default function ReportScreen() {
       } else {
         Alert.alert("PDF saved", `Saved to: ${uri}`);
       }
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to generate PDF.");
     } finally {
       setDownloading(false);
@@ -262,7 +304,12 @@ export default function ReportScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+      <View style={[styles.header, {
+        paddingTop: topPad + 12,
+        backgroundColor: C.backgroundSecondary,
+        borderBottomColor: C.border,
+        flexDirection: isRTL ? "row-reverse" : "row",
+      }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
         </TouchableOpacity>
@@ -284,7 +331,11 @@ export default function ReportScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 120 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 120 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[styles.reportCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <View style={[styles.reportHeader, { backgroundColor: C.primary + "12", borderRadius: 10, padding: 14, marginBottom: 16 }]}>
             <Text style={[styles.reportTitle, { color: C.primary }]}>Hakim — Medical History Report</Text>
@@ -295,7 +346,7 @@ export default function ReportScreen() {
               <View style={[styles.chip, { backgroundColor: C.primary + "20" }]}>
                 <Text style={[styles.chipText, { color: C.primary }]}>{report.patientName}</Text>
               </View>
-              {report.patientAge && (
+              {report.patientAge != null && (
                 <View style={[styles.chip, { backgroundColor: C.backgroundTertiary }]}>
                   <Text style={[styles.chipText, { color: C.textSecondary }]}>{report.patientAge} yrs</Text>
                 </View>
@@ -324,7 +375,12 @@ export default function ReportScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+      <View style={[styles.footer, {
+        paddingBottom: bottomPad + 16,
+        backgroundColor: C.backgroundSecondary,
+        borderTopColor: C.border,
+        flexDirection: isRTL ? "row-reverse" : "row",
+      }]}>
         <TouchableOpacity
           style={[styles.footerBtn, { backgroundColor: C.primary + "12", borderColor: C.primary + "30", flex: 1 }]}
           onPress={handleDownloadPDF}
@@ -347,6 +403,7 @@ export default function ReportScreen() {
       <SendCaseModal
         visible={showSendModal}
         caseId={caseId}
+        token={token}
         onClose={() => setShowSendModal(false)}
         t={t}
         isRTL={isRTL}

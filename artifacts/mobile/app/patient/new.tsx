@@ -21,6 +21,84 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
+function FormField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType = "default",
+  required = false,
+  isRTL = false,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
+  required?: boolean;
+  isRTL?: boolean;
+}) {
+  const textAlign = isRTL ? "right" : "left";
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>
+        {label}
+        {required && <Text style={{ color: C.error }}> *</Text>}
+      </Text>
+      <TextInput
+        style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.backgroundSecondary, textAlign }]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={C.textTertiary}
+        keyboardType={keyboardType}
+        returnKeyType="next"
+      />
+    </View>
+  );
+}
+
+function OptionSelector({
+  label,
+  options,
+  value,
+  onChange,
+  isRTL = false,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  isRTL?: boolean;
+}) {
+  const textAlign = isRTL ? "right" : "left";
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{label}</Text>
+      <View style={styles.optionRow}>
+        {options.map((opt) => (
+          <TouchableOpacity
+            key={opt.value}
+            style={[
+              styles.optionBtn,
+              {
+                backgroundColor: value === opt.value ? C.primary : C.backgroundTertiary,
+                borderColor: value === opt.value ? C.primary : C.border,
+              },
+            ]}
+            onPress={() => onChange(opt.value)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.optionBtnText, { color: value === opt.value ? "#fff" : C.textSecondary }]}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function NewPatientScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -88,31 +166,14 @@ export default function NewPatientScreen() {
     }
   }
 
-  function Field({ label, value, onChangeText, placeholder, keyboardType = "default", required = false }: {
-    label: string; value: string; onChangeText: (t: string) => void;
-    placeholder?: string; keyboardType?: any; required?: boolean;
-  }) {
-    return (
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>
-          {label}{required && <Text style={{ color: C.error }}> *</Text>}
-        </Text>
-        <TextInput
-          style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.backgroundSecondary, textAlign }]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={C.textTertiary}
-          keyboardType={keyboardType}
-          returnKeyType="next"
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: C.backgroundSecondary, borderBottomColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+      <View style={[styles.header, {
+        paddingTop: topPad + 12,
+        backgroundColor: C.backgroundSecondary,
+        borderBottomColor: C.border,
+        flexDirection: isRTL ? "row-reverse" : "row",
+      }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
         </TouchableOpacity>
@@ -120,59 +181,118 @@ export default function NewPatientScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>
             {isRTL ? "بيانات المريض" : "Patient Information"}
           </Text>
-          <Field label={t("fullName")} value={name} onChangeText={setName} placeholder={t("fullNamePlaceholder")} required />
-          <Field label={t("age")} value={age} onChangeText={setAge} placeholder={t("agePlaceholder")} keyboardType="numeric" />
-
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{t("gender")}</Text>
-            <View style={styles.optionRow}>
-              {genderOptions.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionBtn, { backgroundColor: gender === opt.value ? C.primary : C.backgroundTertiary, borderColor: gender === opt.value ? C.primary : C.border }]} onPress={() => setGender(opt.value)} activeOpacity={0.7}>
-                  <Text style={[styles.optionBtnText, { color: gender === opt.value ? "#fff" : C.textSecondary }]}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <Field label={t("occupation")} value={occupation} onChangeText={setOccupation} placeholder={t("occupationPlaceholder")} />
-
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: C.textSecondary, textAlign }]}>{t("maritalStatus")}</Text>
-            <View style={styles.optionRow}>
-              {maritalOptions.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionBtn, { backgroundColor: maritalStatus === opt.value ? C.primary : C.backgroundTertiary, borderColor: maritalStatus === opt.value ? C.primary : C.border }]} onPress={() => setMaritalStatus(opt.value)} activeOpacity={0.7}>
-                  <Text style={[styles.optionBtnText, { color: maritalStatus === opt.value ? "#fff" : C.textSecondary }]}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          <FormField
+            label={t("fullName")}
+            value={name}
+            onChangeText={setName}
+            placeholder={t("fullNamePlaceholder")}
+            required
+            isRTL={isRTL}
+          />
+          <FormField
+            label={t("age")}
+            value={age}
+            onChangeText={setAge}
+            placeholder={t("agePlaceholder")}
+            keyboardType="numeric"
+            isRTL={isRTL}
+          />
+          <OptionSelector
+            label={t("gender")}
+            options={genderOptions}
+            value={gender}
+            onChange={setGender}
+            isRTL={isRTL}
+          />
+          <FormField
+            label={t("occupation")}
+            value={occupation}
+            onChangeText={setOccupation}
+            placeholder={t("occupationPlaceholder")}
+            isRTL={isRTL}
+          />
+          <OptionSelector
+            label={t("maritalStatus")}
+            options={maritalOptions}
+            value={maritalStatus}
+            onChange={setMaritalStatus}
+            isRTL={isRTL}
+          />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>
             {isRTL ? "المقاسات الجسدية" : "Body Measurements"}
           </Text>
-          <Field label={t("weight")} value={weight} onChangeText={setWeight} placeholder={t("weightPlaceholder")} keyboardType="numeric" />
-          <Field label={t("height")} value={height} onChangeText={setHeight} placeholder={t("heightPlaceholder")} keyboardType="numeric" />
+          <FormField
+            label={t("weight")}
+            value={weight}
+            onChangeText={setWeight}
+            placeholder={t("weightPlaceholder")}
+            keyboardType="numeric"
+            isRTL={isRTL}
+          />
+          <FormField
+            label={t("height")}
+            value={height}
+            onChangeText={setHeight}
+            placeholder={t("heightPlaceholder")}
+            keyboardType="numeric"
+            isRTL={isRTL}
+          />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text, textAlign }]}>
             {isRTL ? "بيانات الاتصال" : "Contact Details"}
           </Text>
-          <Field label={t("email")} value={email} onChangeText={setEmail} placeholder={isRTL ? "اختياري" : "optional"} keyboardType="email-address" />
-          <Field label={isRTL ? "الهاتف" : "Phone"} value={phone} onChangeText={setPhone} placeholder={isRTL ? "اختياري" : "optional"} keyboardType="phone-pad" />
+          <FormField
+            label={t("email")}
+            value={email}
+            onChangeText={setEmail}
+            placeholder={isRTL ? "اختياري" : "optional"}
+            keyboardType="email-address"
+            isRTL={isRTL}
+          />
+          <FormField
+            label={isRTL ? "الهاتف" : "Phone"}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder={isRTL ? "اختياري" : "optional"}
+            keyboardType="phone-pad"
+            isRTL={isRTL}
+          />
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: bottomPad + 16, backgroundColor: C.backgroundSecondary, borderTopColor: C.border }]}>
-        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: C.primary, opacity: saving ? 0.7 : 1, flexDirection: isRTL ? "row-reverse" : "row" }]} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color="#fff" /> : (
+      <View style={[styles.footer, {
+        paddingBottom: bottomPad + 16,
+        backgroundColor: C.backgroundSecondary,
+        borderTopColor: C.border,
+      }]}>
+        <TouchableOpacity
+          style={[styles.saveBtn, {
+            backgroundColor: C.primary,
+            opacity: saving ? 0.7 : 1,
+            flexDirection: isRTL ? "row-reverse" : "row",
+          }]}
+          onPress={handleSave}
+          disabled={saving}
+          activeOpacity={0.85}
+        >
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
             <>
               <Feather name="user-plus" size={18} color="#fff" />
               <Text style={styles.saveBtnText}>{isRTL ? "إضافة مريض" : "Create Patient"}</Text>
@@ -186,7 +306,13 @@ export default function NewPatientScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
+  header: {
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
   scroll: { flex: 1 },
@@ -195,7 +321,14 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 4 },
   field: { gap: 6 },
   label: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular" },
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+  },
   optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   optionBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },

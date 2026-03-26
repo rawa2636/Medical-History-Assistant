@@ -45,7 +45,20 @@ interface PatientDetail {
 async function fetchPatient(id: string): Promise<PatientDetail> {
   const res = await fetch(endpoints.patient(parseInt(id)));
   if (!res.ok) throw new Error("Failed to fetch patient");
-  return res.json();
+  const data = await res.json();
+  // API returns {patient, profile, cases} — flatten to match screen expectations
+  const patient = data.patient ?? data;
+  const rawCases = data.cases ?? [];
+  return {
+    ...patient,
+    cases: rawCases.map((c: any) => ({
+      id: c.id,
+      chiefComplaint: Array.isArray(c.chiefComplaints) ? c.chiefComplaints[0] ?? null : c.chiefComplaints ?? null,
+      status: c.status,
+      createdAt: c.createdAt,
+      hasReport: !!c.hasReport || c.status === "completed",
+    })),
+  };
 }
 
 function CaseCard({ patientCase, isRTL }: { patientCase: Case; isRTL: boolean }) {
