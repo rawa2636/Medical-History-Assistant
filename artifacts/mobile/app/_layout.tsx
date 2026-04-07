@@ -35,6 +35,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     const firstSegment = (segments[0] as string | undefined) ?? "";
     const isPublic = PUBLIC_SEGMENTS.includes(firstSegment);
 
+    const isPending =
+      (user?.role === "doctor" || user?.role === "student") &&
+      user?.verificationStatus === "pending";
+
     if (!isAuthenticated && !isPublic) {
       router.replace("/login");
     } else if (isAuthenticated && firstSegment === "login") {
@@ -42,9 +46,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace("/admin" as any);
       } else if (user?.role === "patient") {
         router.replace("/patient-portal" as any);
+      } else if (isPending) {
+        router.replace("/pending" as any);
       } else {
         router.replace("/");
       }
+    } else if (isAuthenticated && isPending && firstSegment !== "pending") {
+      router.replace("/pending" as any);
     }
   }, [isAuthenticated, isLoading, segments, user]);
 
@@ -73,6 +81,7 @@ function RootLayoutNav() {
       <Stack.Screen name="admin/universities" />
       <Stack.Screen name="patient-portal/index" />
       <Stack.Screen name="patient-portal/consult" />
+      <Stack.Screen name="pending" />
     </Stack>
   );
 }

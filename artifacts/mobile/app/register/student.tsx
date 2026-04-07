@@ -58,6 +58,44 @@ function Field({
   );
 }
 
+function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: C.textSecondary }]}>
+        {label}{required && <Text style={{ color: C.error }}> *</Text>}
+      </Text>
+      <View style={[styles.passwordRow, { borderColor: C.border, backgroundColor: C.backgroundSecondary }]}>
+        <TextInput
+          style={[styles.passwordInput, { color: C.text }]}
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor={C.textTertiary}
+          secureTextEntry={!show}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TouchableOpacity onPress={() => setShow(!show)} style={styles.eyeBtn}>
+          <Feather name={show ? "eye-off" : "eye"} size={18} color={C.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 const STUDY_YEARS = [1, 2, 3, 4, 5, 6, 7];
 
 export default function StudentRegisterScreen() {
@@ -68,6 +106,8 @@ export default function StudentRegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
   const [cardNumber, setCardNumber] = useState("");
   const [studyYear, setStudyYear] = useState(0);
@@ -89,6 +129,18 @@ export default function StudentRegisterScreen() {
       Alert.alert("بيانات ناقصة", "يرجى إدخال الاسم والبريد الإلكتروني ورقم البطاقة والسنة الدراسية.");
       return;
     }
+    if (!password) {
+      Alert.alert("كلمة المرور مطلوبة", "يرجى إدخال كلمة مرور لحسابك.");
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert("كلمة المرور قصيرة", "يجب أن تكون كلمة المرور 8 أحرف على الأقل.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("كلمة المرور غير متطابقة", "يرجى التأكد من تطابق كلمة المرور وتأكيدها.");
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
@@ -100,6 +152,7 @@ export default function StudentRegisterScreen() {
         body: JSON.stringify({
           fullName,
           email,
+          password,
           phone: phone || null,
           universityId: selectedUniversity?.id || null,
           universityCardNumber: cardNumber,
@@ -146,19 +199,23 @@ export default function StudentRegisterScreen() {
             styles.successBanner,
             { backgroundColor: autoVerified ? C.success + "12" : C.warning + "12", borderColor: autoVerified ? C.success + "30" : C.warning + "30" },
           ]}>
+            <Feather name={autoVerified ? "check-circle" : "clock"} size={16} color={autoVerified ? C.success : C.warning} />
             <Text style={[styles.successBannerText, { color: autoVerified ? C.success : C.warning }]}>
               {autoVerified
-                ? "تطابقت بياناتك مع سجلات الجامعة — حسابك نشط الآن"
-                : "بياناتك قيد المراجعة. سيتم إشعارك بعد التحقق من بطاقتك الجامعية"}
+                ? "تطابقت بياناتك مع سجلات الجامعة — حسابك نشط الآن. يمكنك تسجيل الدخول."
+                : "بياناتك قيد المراجعة من الإدارة. يمكنك تسجيل الدخول بعد الموافقة على حسابك."}
             </Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.homeBtn, { backgroundColor: C.primary }]}
-            onPress={() => router.replace("/")}
+            style={[styles.homeBtn, { backgroundColor: autoVerified ? C.success : C.primary }]}
+            onPress={() => router.replace("/login")}
             activeOpacity={0.85}
           >
-            <Text style={styles.homeBtnText}>العودة للرئيسية</Text>
+            <Text style={styles.homeBtnText}>تسجيل الدخول</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.replace("/")} activeOpacity={0.7}>
+            <Text style={[styles.skipText, { color: C.textSecondary }]}>العودة للرئيسية</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -257,8 +314,8 @@ export default function StudentRegisterScreen() {
                   style={[
                     styles.yearBtn,
                     {
-                      backgroundColor: studyYear === year ? C.primary : C.backgroundSecondary,
-                      borderColor: studyYear === year ? C.primary : C.border,
+                      backgroundColor: studyYear === year ? "#805AD5" : C.backgroundSecondary,
+                      borderColor: studyYear === year ? "#805AD5" : C.border,
                     },
                   ]}
                   onPress={() => {
@@ -274,6 +331,42 @@ export default function StudentRegisterScreen() {
               ))}
             </View>
           </View>
+        </View>
+
+        <View style={[styles.section, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+          <Text style={[styles.sectionTitle, { color: C.text }]}>كلمة المرور</Text>
+          <View style={[styles.passwordHint, { backgroundColor: C.backgroundTertiary }]}>
+            <Feather name="lock" size={13} color={C.textSecondary} />
+            <Text style={[styles.passwordHintText, { color: C.textSecondary }]}>
+              ستستخدم كلمة المرور هذه لتسجيل الدخول بعد الموافقة على حسابك
+            </Text>
+          </View>
+          <PasswordField
+            label="كلمة المرور"
+            value={password}
+            onChange={setPassword}
+            placeholder="8 أحرف على الأقل"
+            required
+          />
+          <PasswordField
+            label="تأكيد كلمة المرور"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            placeholder="أعد كتابة كلمة المرور"
+            required
+          />
+          {confirmPassword.length > 0 && password !== confirmPassword && (
+            <View style={[styles.errorRow, { backgroundColor: C.errorLight }]}>
+              <Feather name="alert-circle" size={13} color={C.error} />
+              <Text style={[styles.errorText, { color: C.error }]}>كلمة المرور غير متطابقة</Text>
+            </View>
+          )}
+          {confirmPassword.length > 0 && password === confirmPassword && password.length >= 8 && (
+            <View style={[styles.successRow, { backgroundColor: C.successLight }]}>
+              <Feather name="check-circle" size={13} color={C.success} />
+              <Text style={[styles.successText, { color: C.success }]}>كلمة المرور متطابقة</Text>
+            </View>
+          )}
         </View>
 
         <View style={[styles.section, { backgroundColor: C.backgroundTertiary, borderColor: C.border }]}>
@@ -328,6 +421,15 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   label: { fontSize: 13, fontFamily: "Inter_500Medium" },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular" },
+  passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 10, overflow: "hidden" },
+  passwordInput: { flex: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular" },
+  eyeBtn: { paddingHorizontal: 14, paddingVertical: 11 },
+  passwordHint: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 10, borderRadius: 10 },
+  passwordHintText: { fontSize: 12, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 17 },
+  errorRow: { flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 8 },
+  errorText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  successRow: { flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 8 },
+  successText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   universityScroll: { maxHeight: 200 },
   universityList: { gap: 8 },
   noUniversities: { fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic", padding: 8 },
@@ -344,8 +446,9 @@ const styles = StyleSheet.create({
   successScreen: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
   successIcon: { width: 100, height: 100, borderRadius: 30, alignItems: "center", justifyContent: "center" },
   successTitle: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "center" },
-  successBanner: { padding: 14, borderRadius: 14, borderWidth: 1 },
-  successBannerText: { fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "center", lineHeight: 20 },
-  homeBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 14, marginTop: 8 },
+  successBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
+  successBannerText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 20 },
+  homeBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 14, marginTop: 4 },
   homeBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  skipText: { fontSize: 14, fontFamily: "Inter_400Regular" },
 });
