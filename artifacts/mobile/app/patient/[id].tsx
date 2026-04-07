@@ -20,45 +20,64 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = Colors.light;
 
-interface Case {
+interface CaseItem {
   id: number;
-  chiefComplaint: string | null;
+  chiefComplaints: Array<{ symptom: string; symptomAr: string; duration: string }>;
   status: string;
   createdAt: string;
-  hasReport: boolean;
 }
 
-interface PatientDetail {
-  id: number;
-  name: string;
-  age: number | null;
-  gender: string | null;
-  occupation: string | null;
-  email: string | null;
-  phone: string | null;
-  weight: string | null;
-  height: string | null;
-  maritalStatus: string | null;
-  cases: Case[];
+interface PatientApiResponse {
+  patient: {
+    id: number;
+    name: string;
+    age: number | null;
+    gender: string | null;
+    occupation: string | null;
+    email: string | null;
+    phone: string | null;
+    weight: string | null;
+    height: string | null;
+    maritalStatus: string | null;
+  };
+  profile: Record<string, unknown> | null;
+  cases: CaseItem[];
 }
 
-async function fetchPatient(id: string): Promise<PatientDetail> {
+async function fetchPatient(id: string): Promise<PatientApiResponse> {
   const res = await fetch(endpoints.patient(parseInt(id)));
   if (!res.ok) throw new Error("Failed to fetch patient");
   return res.json();
 }
 
-function CaseCard({ patientCase, isRTL }: { patientCase: Case; isRTL: boolean }) {
+function CaseCard({ patientCase, isRTL }: { patientCase: CaseItem; isRTL: boolean }) {
+  const hasReport = patientCase.status === "report_ready" || patientCase.status === "completed";
+  const firstComplaint = patientCase.chiefComplaints?.[0];
+  const displayComplaint = isRTL
+    ? firstComplaint?.symptomAr || firstComplaint?.symptom
+    : firstComplaint?.symptom;
+
   const statusColor =
-    patientCase.status === "completed" ? C.success :
-    patientCase.status === "in_progress" ? C.accent : C.textTertiary;
+    hasReport ? C.success :
+    patientCase.status === "interviewing" || patientCase.status === "interview_complete" ? C.accent :
+    C.textTertiary;
+
+  const statusLabel = isRTL
+    ? hasReport ? "تقرير جاهز"
+      : patientCase.status === "interview_complete" ? "مقابلة مكتملة"
+      : patientCase.status === "interviewing" ? "قيد المقابلة"
+      : "جديدة"
+    : hasReport ? "Report ready"
+      : patientCase.status === "interview_complete" ? "Interview done"
+      : patientCase.status === "interviewing" ? "In progress"
+      : "New";
 
   return (
     <TouchableOpacity
-      style={[styles.caseCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}
+      style={[styles.caseCard, { backgroundColor: C.backgroundSecondary, borderColor: hasReport ? C.success + "40" : C.border, flexDirection: isRTL ? "row-reverse" : "row" }]}
       onPress={() => {
         Haptics.selectionAsync();
-        if (patientCase.hasReport) {
+        if (hasReport) {
           router.push({ pathname: "/case/report/[caseId]", params: { caseId: patientCase.id } });
         } else {
           router.push({ pathname: "/case/ros/[caseId]", params: { caseId: patientCase.id } });
@@ -67,14 +86,14 @@ function CaseCard({ patientCase, isRTL }: { patientCase: Case; isRTL: boolean })
       activeOpacity={0.7}
     >
       <View style={[styles.caseIconWrap, { backgroundColor: statusColor + "20" }]}>
-        <Feather name={patientCase.hasReport ? "file-text" : "activity"} size={18} color={statusColor} />
+        <Feather name={hasReport ? "file-text" : "activity"} size={18} color={statusColor} />
       </View>
       <View style={[styles.caseContent, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
         <Text style={[styles.caseComplaint, { color: C.text }]} numberOfLines={1}>
-          {patientCase.chiefComplaint || "Case #" + patientCase.id}
+          {displayComplaint || (isRTL ? `حالة #${patientCase.id}` : `Case #${patientCase.id}`)}
         </Text>
         <Text style={[styles.caseMeta, { color: C.textSecondary }]}>
-          {new Date(patientCase.createdAt).toLocaleDateString()} · {patientCase.status.replace("_", " ")}
+          {new Date(patientCase.createdAt).toLocaleDateString(isRTL ? "ar-SA" : "en-GB")} · {statusLabel}
         </Text>
       </View>
       <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={16} color={C.textTertiary} />
@@ -91,7 +110,10 @@ export default function PatientDetailScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const textAlign = isRTL ? "right" : "left";
 
-  const { data: patient, isLoading, error } = useQuery({ queryKey: ["patient", id], queryFn: () => fetchPatient(id) });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["patient", id],
+    queryFn: () => fetchPatient(id),
+  });
 
   async function handleNewCase() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -110,11 +132,7 @@ export default function PatientDetailScreen() {
     }
   }
 
-  async function handleViewProfile() {
-    router.push({ pathname: "/patient/profile/[id]", params: { id } });
-  }
-
-  const renderCase = useCallback(({ item }: { item: Case }) => (
+  const renderCase = useCallback(({ item }: { item: CaseItem }) => (
     <CaseCard patientCase={item} isRTL={isRTL} />
   ), [isRTL]);
 
@@ -122,12 +140,13 @@ export default function PatientDetailScreen() {
     return <View style={[styles.center, { backgroundColor: C.background }]}><ActivityIndicator size="large" color={C.primary} /></View>;
   }
 
-  if (error || !patient) {
+  if (error || !data) {
     return <View style={[styles.center, { backgroundColor: C.background }]}><Text style={{ color: C.error }}>{t("errorLoadingPatients")}</Text></View>;
   }
 
+  const { patient, cases } = data;
   const initials = patient.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const meta = [patient.age ? `${patient.age} yrs` : null, patient.gender].filter(Boolean).join(" · ");
+  const meta = [patient.age ? `${patient.age} ${isRTL ? "سنة" : "yrs"}` : null, patient.gender].filter(Boolean).join(" · ");
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
@@ -136,7 +155,11 @@ export default function PatientDetailScreen() {
           <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: C.text }]}>{t("patientFile")}</Text>
-        <TouchableOpacity style={[styles.profileBtn, { borderColor: C.border }]} onPress={handleViewProfile} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={[styles.profileBtn, { borderColor: C.border }]}
+          onPress={() => router.push({ pathname: "/patient/profile/[id]", params: { id } })}
+          activeOpacity={0.7}
+        >
           <Feather name="user" size={16} color={C.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -145,7 +168,7 @@ export default function PatientDetailScreen() {
         <View style={[styles.bigAvatar, { backgroundColor: C.primary + "20" }]}>
           <Text style={[styles.bigAvatarText, { color: C.primary }]}>{initials}</Text>
         </View>
-        <View style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
+        <View style={{ alignItems: isRTL ? "flex-end" : "flex-start", flex: 1 }}>
           <Text style={[styles.patientName, { color: C.text, textAlign }]}>{patient.name}</Text>
           {meta ? <Text style={[styles.patientMeta, { color: C.textSecondary }]}>{meta}</Text> : null}
           {patient.occupation && <Text style={[styles.patientOccupation, { color: C.textTertiary }]}>{patient.occupation}</Text>}
@@ -153,7 +176,7 @@ export default function PatientDetailScreen() {
       </View>
 
       <FlatList
-        data={patient.cases}
+        data={cases}
         keyExtractor={(c) => String(c.id)}
         renderItem={renderCase}
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad + 100 }]}
@@ -161,7 +184,7 @@ export default function PatientDetailScreen() {
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         ListHeaderComponent={() => (
           <Text style={[styles.sectionLabel, { color: C.textSecondary, textAlign }]}>
-            {isRTL ? `الحالات (${patient.cases.length})` : `Cases (${patient.cases.length})`}
+            {isRTL ? `الحالات (${cases.length})` : `Cases (${cases.length})`}
           </Text>
         )}
         ListEmptyComponent={() => (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { endpoints } from "@/constants/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -105,6 +105,33 @@ function SelectOption({ label, options, arOptions, value, onChange, isRTL, textA
   );
 }
 
+interface ProfileData {
+  chronicConditions?: string[] | null;
+  surgicalHistory?: string[] | null;
+  currentMedications?: Array<{ name: string } | string> | null;
+  allergies?: Array<{ allergen: string } | string> | null;
+  familyHistory?: { conditions?: string[] } | null;
+  smokingStatus?: string | null;
+  alcoholUse?: string | null;
+}
+
+async function fetchPatientProfile(id: string): Promise<ProfileData | null> {
+  const res = await fetch(endpoints.patient(parseInt(id)));
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.profile || null;
+}
+
+function extractStringArray(arr: Array<{ name: string } | { allergen: string } | string> | null | undefined): string[] {
+  if (!arr) return [];
+  return arr.map((item) => {
+    if (typeof item === "string") return item;
+    if ("name" in item) return item.name;
+    if ("allergen" in item) return item.allergen;
+    return "";
+  }).filter(Boolean);
+}
+
 export default function PatientProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -114,6 +141,7 @@ export default function PatientProfileScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const textAlign = isRTL ? "right" : "left";
   const [saving, setSaving] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   const [chronicConditions, setChronicConditions] = useState<string[]>([]);
   const [surgicalHistory, setSurgicalHistory] = useState<string[]>([]);
@@ -122,6 +150,24 @@ export default function PatientProfileScreen() {
   const [familyConditions, setFamilyConditions] = useState<string[]>([]);
   const [smokingStatus, setSmokingStatus] = useState("");
   const [alcoholUse, setAlcoholUse] = useState("");
+
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ["patient-profile", id],
+    queryFn: () => fetchPatientProfile(id),
+  });
+
+  useEffect(() => {
+    if (profile && !initialized) {
+      setChronicConditions(profile.chronicConditions || []);
+      setSurgicalHistory(profile.surgicalHistory || []);
+      setMedications(extractStringArray(profile.currentMedications as any));
+      setAllergies(extractStringArray(profile.allergies as any));
+      setFamilyConditions(profile.familyHistory?.conditions || []);
+      setSmokingStatus(profile.smokingStatus || "");
+      setAlcoholUse(profile.alcoholUse || "");
+      setInitialized(true);
+    }
+  }, [profile, initialized]);
 
   async function handleSave() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -143,12 +189,22 @@ export default function PatientProfileScreen() {
       });
       if (!res.ok) throw new Error("Failed to save");
       await queryClient.invalidateQueries({ queryKey: ["patient", id] });
+      await queryClient.invalidateQueries({ queryKey: ["patient-profile", id] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch {
-      Alert.alert("Error", "Failed to save profile. Please try again.");
+      Alert.alert(isRTL ? "خطأ" : "Error", isRTL ? "فشل حفظ الملف. حاول مجدداً." : "Failed to save profile. Please try again.");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <View style={[styles.center, { backgroundColor: C.background }]}>
+        <ActivityIndicator size="large" color={C.primary} />
+      </View>
+    );
   }
 
   return (
@@ -162,10 +218,12 @@ export default function PatientProfileScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <View style={[styles.infoBox, { backgroundColor: C.primary + "10", borderColor: C.primary + "30", flexDirection: isRTL ? "row-reverse" : "row" }]}>
-          <Feather name="info" size={16} color={C.primary} />
-          <Text style={[styles.infoText, { color: C.primary, textAlign }]}>
-            {isRTL ? "هذه المعلومات تُحفظ بشكل دائم وتُستخدم في جميع الاستشارات المستقبلية." : "This information is stored permanently and used in all future consultations."}
+        <View style={[styles.infoBox, { backgroundColor: profile ? C.success + "15" : C.primary + "10", borderColor: profile ? C.success + "40" : C.primary + "30", flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <Feather name={profile ? "check-circle" : "info"} size={16} color={profile ? C.success : C.primary} />
+          <Text style={[styles.infoText, { color: profile ? C.success : C.primary, textAlign }]}>
+            {profile
+              ? (isRTL ? "تم تحميل الملف الطبي الموجود. يمكنك تعديله وحفظه." : "Existing profile loaded. You can edit and save changes.")
+              : (isRTL ? "هذه المعلومات تُحفظ بشكل دائم وتُستخدم في جميع الاستشارات المستقبلية." : "This information is stored permanently and used in all future consultations.")}
           </Text>
         </View>
 
@@ -265,6 +323,7 @@ export default function PatientProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   header: { alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },

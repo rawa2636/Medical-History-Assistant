@@ -100,17 +100,22 @@ router.post("/:id/interview/start", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { language } = req.body as { language?: string };
+
+    // ── Parallel fetch: case + patient + profile + session ──
     const [theCase] = await db.select().from(casesTable).where(eq(casesTable.id, id));
     if (!theCase) return res.status(404).json({ error: "Case not found" });
 
-    const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, theCase.patientId));
-    const [profile] = await db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, theCase.patientId));
+    const [[patient], [profile], [existingSession]] = await Promise.all([
+      db.select().from(patientsTable).where(eq(patientsTable.id, theCase.patientId)),
+      db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, theCase.patientId)),
+      db.select().from(interviewSessionsTable).where(eq(interviewSessionsTable.caseId, id)),
+    ]);
 
     const context = buildContextPrompt(patient, profile || null, theCase as { rosSymptoms: unknown; chiefComplaints: unknown });
 
     const completion = await openai.chat.completions.create({
       model: "gpt-5.2",
-      max_completion_tokens: 500,
+      max_completion_tokens: 400,
       messages: [
         { role: "system", content: getSystemPrompt(language) },
         { role: "user", content: context },
@@ -121,8 +126,6 @@ router.post("/:id/interview/start", async (req, res) => {
       ? "مرحباً! دعنا نبدأ بأخذ تاريخك المرضي. هل يمكنك إخباري بالتفصيل عن الشكوى الرئيسية التي أحضرتك اليوم؟"
       : "Hello! Let's start your medical history. Can you tell me more about what brings you in today?";
     const firstMessage = completion.choices[0]?.message?.content || defaultGreeting;
-
-    const [existingSession] = await db.select().from(interviewSessionsTable).where(eq(interviewSessionsTable.caseId, id));
 
     let session;
     const messages = [{ role: "assistant", content: firstMessage, timestamp: new Date().toISOString() }];
@@ -150,20 +153,27 @@ router.post("/:id/interview/message", async (req, res) => {
     const id = parseInt(req.params.id);
     const { message: userMessage, language } = req.body as { message: string; language?: string };
 
+    // ── Parallel fetch: case + session (patient & profile fetched in parallel too) ──
     const [theCase] = await db.select().from(casesTable).where(eq(casesTable.id, id));
     if (!theCase) return res.status(404).json({ error: "Case not found" });
 
-    const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, theCase.patientId));
-    const [profile] = await db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, theCase.patientId));
-    const [session] = await db.select().from(interviewSessionsTable).where(eq(interviewSessionsTable.caseId, id));
+    const [[patient], [profile], [session]] = await Promise.all([
+      db.select().from(patientsTable).where(eq(patientsTable.id, theCase.patientId)),
+      db.select().from(patientProfilesTable).where(eq(patientProfilesTable.patientId, theCase.patientId)),
+      db.select().from(interviewSessionsTable).where(eq(interviewSessionsTable.caseId, id)),
+    ]);
 
     const existingMessages = (session?.messages as Array<{ role: string; content: string; timestamp: string }>) || [];
+
+    // Keep last 20 messages to avoid token overflow (10 exchanges)
+    const recentMessages = existingMessages.slice(-20);
+
     const context = buildContextPrompt(patient, profile || null, theCase as { rosSymptoms: unknown; chiefComplaints: unknown });
 
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: getSystemPrompt(language) },
       { role: "user", content: context },
-      ...existingMessages.map((m) => ({
+      ...recentMessages.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
@@ -176,7 +186,7 @@ router.post("/:id/interview/message", async (req, res) => {
 
     const stream = await openai.chat.completions.create({
       model: "gpt-5.2",
-      max_completion_tokens: 500,
+      max_completion_tokens: 400,
       messages: chatMessages,
       stream: true,
     });
@@ -227,15 +237,17 @@ router.post("/:id/interview/message", async (req, res) => {
 router.post("/:id/interview/complete", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [session] = await db.update(interviewSessionsTable)
-      .set({ isComplete: "true", updatedAt: new Date() })
-      .where(eq(interviewSessionsTable.caseId, id))
-      .returning();
 
-    await db.update(casesTable)
-      .set({ status: "interview_complete", updatedAt: new Date() })
-      .where(eq(casesTable.id, id));
+    await Promise.all([
+      db.update(interviewSessionsTable)
+        .set({ isComplete: "true", updatedAt: new Date() })
+        .where(eq(interviewSessionsTable.caseId, id)),
+      db.update(casesTable)
+        .set({ status: "interview_complete", updatedAt: new Date() })
+        .where(eq(casesTable.id, id)),
+    ]);
 
+    const [session] = await db.select().from(interviewSessionsTable).where(eq(interviewSessionsTable.caseId, id));
     res.json(session);
   } catch (err) {
     req.log.error({ err }, "Failed to complete interview");
