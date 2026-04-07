@@ -16,6 +16,7 @@ export interface AuthUser {
   verificationStatus?: string;
   specialization?: string;
   studyYear?: number;
+  isGuest?: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +24,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string, role: UserRole) => Promise<{ success: boolean; error?: string }>;
+  loginAsGuest: () => void;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -96,6 +98,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginAsGuest = useCallback(() => {
+    const guestUser: AuthUser = {
+      id: 0,
+      fullName: "زائر",
+      email: "guest",
+      role: "doctor",
+      verificationStatus: "approved",
+      isGuest: true,
+    };
+    setToken("guest");
+    setUser(guestUser);
+  }, []);
+
   const login = useCallback(async (email: string, password: string, role: UserRole) => {
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
@@ -143,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         isLoading,
         login,
+        loginAsGuest,
         logout,
         isAuthenticated: !!user,
       }}

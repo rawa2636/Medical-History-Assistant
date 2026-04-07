@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useAuth, type UserRole } from "@/contexts/AuthContext";
+import Colors from "@/constants/colors";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const C = {
@@ -30,7 +31,7 @@ const C = {
 };
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, loginAsGuest } = useAuth();
   const { language, setLanguage, t, isRTL } = useLanguage();
   const [role, setRole] = useState<UserRole>("doctor");
   const [email, setEmail] = useState("");
@@ -74,6 +75,12 @@ export default function LoginScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(result.error || t("loginFailed"));
     }
+  };
+
+  const handleGuestLogin = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    loginAsGuest();
+    router.replace("/");
   };
 
   return (
@@ -187,6 +194,29 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Divider */}
+          <View style={styles.dividerRow}>
+            <View style={[styles.dividerLine, { backgroundColor: C.border }]} />
+            <Text style={[styles.dividerText, { color: C.textSecondary }]}>أو</Text>
+            <View style={[styles.dividerLine, { backgroundColor: C.border }]} />
+          </View>
+
+          {/* Guest / Demo button */}
+          <TouchableOpacity
+            style={[styles.guestBtn, { borderColor: "#D97706" }]}
+            onPress={handleGuestLogin}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.guestBadge, { backgroundColor: "#D9770618" }]}>
+              <Feather name="zap" size={14} color="#D97706" />
+            </View>
+            <View style={styles.guestTextWrap}>
+              <Text style={[styles.guestBtnTitle, { color: "#D97706" }]}>تجربة النظام بدون تسجيل</Text>
+              <Text style={[styles.guestBtnSub, { color: C.textSecondary }]}>وصول كامل للميزات • مناسب لطبيب أو متدرب أو ممرض</Text>
+            </View>
+            <Feather name="arrow-left" size={18} color="#D97706" />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.registerLink} onPress={() => router.push("/register" as any)}>
             <Text style={[styles.registerLinkText, { textAlign: "center" }]}>
               {t("noAccount")}{" "}
@@ -245,6 +275,22 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.error, flex: 1 },
   loginBtn: { height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 4 },
   loginBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  guestBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: "#FFFBEB",
+  },
+  guestBadge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  guestTextWrap: { flex: 1 },
+  guestBtnTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  guestBtnSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   registerLink: { alignItems: "center", paddingVertical: 8 },
   registerLinkText: { fontSize: 14, fontFamily: "Inter_400Regular", color: C.textSecondary },
 });
